@@ -5,7 +5,12 @@ All notable changes to this project will be documented in this file. Format foll
 ## [Unreleased]
 
 ### Added
+- `SECURITY.md` — disclosure policy, GitHub Security Advisories preferred, scope (in-this-repo vs upstream), 90-day public disclosure timeline, security-relevant context (OZ pin, key handling, replay-rejection bindings).
+- `stateset clean` subcommand — removes `cache/`, `out/`, `broadcast/`, `node_modules/`, and `.run/`. `--all` also removes `contracts/lib/` (the forge-installed Solidity deps).
 - `.github/ISSUE_TEMPLATE/` — structured bug-report + feature-request forms; the bug form prompts for `./stack/stateset doctor` output up front.
+
+### Fixed
+- `docs/ARCHITECTURE.md` and `docs/THREAT_MODEL.md` — replaced monorepo-only paths (`set/contracts/`, `ves-demo/`) with the quickstart's actual paths (`contracts/`, `bridges/`, `demos/`). Architecture doc now also explicitly enumerates the upstream repos (sequencer, stark, monorepo) it references.
 - `.github/PULL_REQUEST_TEMPLATE.md` — checklist (test plan, CHANGELOG update, scope check).
 - `.github/dependabot.yml` — weekly npm + GitHub Actions dependency updates.
 - CI workflow now supports `workflow_dispatch` — re-run any time from the Actions tab without pushing.

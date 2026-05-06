@@ -46,6 +46,7 @@ ${B}stateset${X} — local-stack orchestrator
   ${C}test${X}              contracts + bridges + demos
   ${C}doctor${X} [--fix]    health check; --fix auto-remediates
   ${C}version${X}           print versions of forge, node, cast, this CLI
+  ${C}clean${X}             remove cache/, out/, broadcast/, node_modules/, run/
 
 Env: RPC=${RPC}
 EOF
@@ -64,6 +65,24 @@ running_pid() { [ -f "$PIDDIR/$1.pid" ] && kill -0 "$(cat "$PIDDIR/$1.pid")" 2>/
 # ─── commands ────────────────────────────────────────────────────────────
 case "${1:-}" in
   ""|-h|--help|help) usage ;;
+
+  clean)
+    # Remove all build/runtime artifacts so a fresh setup runs from scratch.
+    # Does NOT remove `lib/` (Solidity deps) — `forge install` is heavy enough
+    # that we leave them; pass `--all` to remove those too.
+    all=0; [ "${2:-}" = "--all" ] && all=1
+    info "removing forge cache + out + broadcast"
+    rm -rf "$ROOT/contracts/cache" "$ROOT/contracts/out" "$ROOT/contracts/broadcast" "$ROOT/contracts/foundry.lock"
+    info "removing bridges/ + demos/ node_modules"
+    rm -rf "$ROOT/bridges/node_modules" "$ROOT/demos/node_modules"
+    info "removing stack runtime state (.run/ pidfiles + logs)"
+    rm -rf "$PIDDIR"
+    if [ $all -eq 1 ]; then
+      info "removing contracts/lib (forge-std + OpenZeppelin)"
+      rm -rf "$ROOT/contracts/lib"
+    fi
+    ok "clean. next: ${B}bash stack/setup.sh${X}"
+    ;;
 
   version|--version|-v)
     echo "stateset (icommerce-quickstart) v0.1.0"

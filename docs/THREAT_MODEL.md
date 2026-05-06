@@ -35,9 +35,9 @@ The protocol's safety reduces to these assumptions. If any one of them fails, th
 
 | Threat | Mitigation | Code | Residual |
 |--------|------------|------|----------|
-| Modify a receipt JSON between issuer and verifier | Receipt's claims re-checked by `verify-receipt.mjs` against the chain — receipt is metadata, the chain is truth | [`verify-receipt.mjs`](../ves-demo/verify-receipt.mjs) | None for chain-anchored claims; the receipt itself is just a convenience surface |
+| Modify a receipt JSON between issuer and verifier | Receipt's claims re-checked by `verify-receipt.mjs` against the chain — receipt is metadata, the chain is truth | [`verify-receipt.mjs`](../demos/verify-receipt.mjs) | None for chain-anchored claims; the receipt itself is just a convenience surface |
 | Modify a STARK proof file | Proof bytes hash to the same `proofHash` committed on chain; verifier rejects mismatch | `commitBatchWithStarkProof` + `verifyStarkProofHash` | None |
-| Manipulate FX rate between quote and lock | Quote's `updatedAt` + TTL enforced on every `convert()` read; rate stamped into `deliveryReceiptHash` at lock time | [`FxOracle.getQuote`](../set/contracts/commerce/FxOracle.sol) | Operator can post arbitrarily wrong quote (A6-class); v2 should accept multi-source attestation |
+| Manipulate FX rate between quote and lock | Quote's `updatedAt` + TTL enforced on every `convert()` read; rate stamped into `deliveryReceiptHash` at lock time | [`FxOracle.getQuote`](../contracts/commerce/FxOracle.sol) | Operator can post arbitrarily wrong quote (A6-class); v2 should accept multi-source attestation |
 | Tamper with sequencer's commitment after it's anchored | `SetRegistry.commitments[batchId]` is immutable post-write; state-chain continuity enforced under strict mode | `SetRegistry._validateAndStoreBatch` | None |
 | Front-run an `escrow.lock` to steal the order | Order is keyed on caller-supplied `orderId`; only the buyer can lock with their funds | `OrderEscrow.lock` | None — locking is buyer-specific |
 | Inject a different intent into a Merkle batch | `verifyPaymentInclusion` checks Merkle path; sequencer can't include intents the original signer didn't sign | `SetPaymentBatch.verifyPaymentInclusion` | Sequencer can refuse to include valid intents (censorship; A1-class) |
@@ -114,10 +114,10 @@ Bullet honesty:
 ## How to validate this threat model
 
 Every line above maps to either:
-- **A specific contract function or modifier** — verify by reading the `set/contracts/` source
-- **A specific bridge primitive** — verify by reading `ves-demo/bridge-*.mjs`
-- **A specific test in the Foundry suite** — `forge test --match-contract OrderEscrow` runs 13/13 green; `--match-contract FxOracle` runs 7/7
-- **A demo that exercises the path** — `./setup.sh --thesis-tour` runs 14/14
+- **A specific contract function or modifier** — verify by reading the [`contracts/`](../contracts/) source
+- **A specific bridge primitive** — verify by reading [`bridges/on-ramp.mjs`](../bridges/on-ramp.mjs) / [`off-ramp.mjs`](../bridges/off-ramp.mjs)
+- **A specific test in the Foundry suite** — `cd contracts && forge test --match-contract OrderEscrow` runs 13/13 green; `--match-contract FxOracle` runs 7/7; `--match-contract NAVOracle` runs 27/27
+- **A demo that exercises the path** — `./stack/stateset demo lifecycle` and `./stack/stateset demo realmoney --currency JPY --payout-currency GBP`
 - **A documented gap** — listed in the "NOT mitigated" section, not glossed
 
 If you're running an enterprise security review on this stack, the artifacts to read are this doc, [ARCHITECTURE.md](./ARCHITECTURE.md), and the Foundry test output. Together they cover threat → mitigation → test → demo for every claim the protocol makes.

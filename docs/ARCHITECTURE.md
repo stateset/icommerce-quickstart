@@ -165,28 +165,51 @@ Every transition is either an on-chain transaction (verifiable via `cast`/RPC) o
 
 ## Operational layout
 
+### In this repo (`icommerce-quickstart`)
+
 ```
-GIT REPO ROOT
-├── set/contracts/         Solidity (Foundry, OpenZeppelin)
-│   ├── SetRegistry.sol
+icommerce-quickstart/
+├── contracts/             Solidity (Foundry, OpenZeppelin v5.0.0)
+│   ├── SetRegistry.sol                  ← state-root + STARK metadata
 │   ├── commerce/
-│   │   ├── OrderEscrow.sol            ← the protocol's heart
-│   │   ├── FxOracle.sol
+│   │   ├── OrderEscrow.sol              ← the protocol's heart (5-state)
+│   │   ├── FxOracle.sol                 ← per-pair FX with TTL
 │   │   ├── SetPaymentBatch.sol
 │   │   └── SetPaymaster.sol
 │   ├── stablecoin/
-│   │   ├── SSDC.sol  + NAVOracle.sol
+│   │   ├── SSDC.sol + NAVOracle.sol     ← rebasing T-bill-backed stable
 │   │   └── interfaces/
-│   ├── test/                          ← Foundry test suites
-│   └── script/DeployAgentReceipt.s.sol
+│   ├── test/                            ← OrderEscrow, FxOracle, SetRegistry, NAVOracle
+│   └── script/DeployLocal.s.sol         ← anvil deploy + 4 FX seeds
 │
-├── stateset-sequencer/    Rust (Axum + Postgres) — VES + x402 API
-├── stateset-stark/        Rust (Winterfell) — STARK prover + verifier
-├── set/anchor/            Rust — sequencer → SetRegistry poller
+├── bridges/               Node (ethers) — fiat ↔ SSDC HTTP servers
+│   ├── on-ramp.mjs                      ← Stripe webhook → SSDC mint
+│   └── off-ramp.mjs                     ← signed payout → SSDC pull
 │
-├── ves-demo/              Node demos + bridges
-│   ├── agent-receipt.mjs                  hero
-│   ├── claude-agent-receipt.mjs           buyer + arbiter scenarios
+├── demos/                 Node + shell — exercise the stack end-to-end
+│   ├── escrow-lifecycle.mjs             ← simplest, ethers-only
+│   ├── realmoney-loop.mjs               ← full multi-currency cycle
+│   ├── verify-receipt.mjs               ← 3-layer audit (schema, on-chain, STARK)
+│   └── audit-with-cast.sh               ← pure shell, no Node
+│
+├── schemas/               JSON Schemas (3 receipt formats)
+└── stack/stateset         single-entry CLI orchestrator
+```
+
+### Upstream (referenced, not bundled)
+
+| Repo | Role |
+|---|---|
+| [`stateset/stateset-sequencer`](https://github.com/stateset/stateset-sequencer) | Rust (Axum + Postgres) — VES + x402 API |
+| [`stateset/stateset-starks`](https://github.com/stateset/stateset-starks) | Rust (Winterfell) — STARK prover + `ves-stark` verifier CLI |
+| [`stateset/icommerce-app`](https://github.com/stateset/icommerce-app) | Full platform monorepo: above + MCP tooling, admin UI, sync engine |
+
+### Legacy mention (older monorepo paths in upstream icommerce-app)
+
+```
+ves-demo/              Node demos + bridges
+├── agent-receipt.mjs                  hero
+├── claude-agent-receipt.mjs           buyer + arbiter scenarios
 │   ├── claude-agent-cfo.mjs               CFO scenario
 │   ├── marketplace-fee/yield/...-demo     each commerce primitive
 │   ├── cross-border-demo.mjs              multi-currency
