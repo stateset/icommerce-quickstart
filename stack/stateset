@@ -45,6 +45,7 @@ ${B}stateset${X} — local-stack orchestrator
 
   ${C}test${X}              contracts + bridges + demos
   ${C}doctor${X} [--fix]    health check; --fix auto-remediates
+  ${C}version${X}           print versions of forge, node, cast, this CLI
 
 Env: RPC=${RPC}
 EOF
@@ -63,6 +64,15 @@ running_pid() { [ -f "$PIDDIR/$1.pid" ] && kill -0 "$(cat "$PIDDIR/$1.pid")" 2>/
 # ─── commands ────────────────────────────────────────────────────────────
 case "${1:-}" in
   ""|-h|--help|help) usage ;;
+
+  version|--version|-v)
+    echo "stateset (icommerce-quickstart) v0.1.0"
+    echo "  RPC=$RPC"
+    echo "  ROOT=$ROOT"
+    command -v forge >/dev/null && echo "  forge: $(forge --version 2>&1 | head -1)" || echo "  forge: ${R}not installed${X}"
+    command -v node  >/dev/null && echo "  node:  $(node --version)" || echo "  node:  ${R}not installed${X}"
+    command -v cast  >/dev/null && echo "  cast:  installed" || echo "  cast:  ${Y}not installed (only needed for seed-fx + audit-with-cast)${X}"
+    ;;
 
   up)
     if anvil_up; then ok "anvil already up"
@@ -173,12 +183,24 @@ case "${1:-}" in
 
   doctor)
     fix=0; [ "${2:-}" = "--fix" ] && fix=1
-    anvil_up && ok "anvil $RPC" || { bad "anvil down"; [ $fix = 1 ] && warn "doctor --fix can't start anvil for you (privileged); run: $0 up"; }
+    # Tooling
+    command -v forge >/dev/null && ok "forge $(forge --version 2>&1 | head -1 | cut -d' ' -f2)" || bad "forge not installed (https://book.getfoundry.sh)"
+    command -v node  >/dev/null && ok "node $(node --version)" || bad "node not installed"
+    command -v cast  >/dev/null && ok "cast available" || warn "cast not on PATH (needed for seed-fx + audit-with-cast)"
+    # Solidity deps
+    [ -d "$ROOT/contracts/lib/forge-std" ] && ok "forge-std installed" || { warn "forge-std missing (cd contracts && forge install foundry-rs/forge-std)"; }
+    [ -d "$ROOT/contracts/lib/openzeppelin-contracts" ] && ok "openzeppelin-contracts installed" \
+      || warn "openzeppelin-contracts missing (forge install OpenZeppelin/openzeppelin-contracts@v5.0.0)"
+    # Runtime
+    anvil_up && ok "anvil $RPC" || { bad "anvil down"; [ $fix = 1 ] && warn "doctor --fix can't start anvil (privileged); run: $0 up"; }
     [ -f "$ROOT/contracts/broadcast/DeployLocal.s.sol/84532001/run-latest.json" ] \
       && ok "contracts deployed" || { warn "contracts not deployed"; [ $fix = 1 ] && "$0" deploy; }
     running_pid on-ramp  && ok "on-ramp"  || { warn "on-ramp down"; [ $fix = 1 ] && "$0" bridges; }
     running_pid off-ramp && ok "off-ramp" || warn "off-ramp down"
-    command -v ves-stark >/dev/null && ok "ves-stark on PATH" || warn "ves-stark not on PATH (set STARK_BIN if you have it)"
+    # Schemas + verifier
+    [ -d "$ROOT/schemas" ] && ok "schemas/ present ($(ls "$ROOT/schemas/"*.schema.json 2>/dev/null | wc -l | tr -d ' ') files)" || bad "schemas/ missing"
+    [ -n "${STARK_BIN:-}" ] && [ -x "$STARK_BIN" ] && ok "STARK_BIN=$STARK_BIN" \
+      || (command -v ves-stark >/dev/null && ok "ves-stark on PATH" || warn "ves-stark not on PATH (set STARK_BIN if you have it; only needed for compliance bundles)")
     ;;
 
   *) echo "unknown command: $1"; usage; exit 2 ;;
