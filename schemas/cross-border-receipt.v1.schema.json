@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stateset.com/schemas/cross-border-receipt.v1.json",
+  "title": "StateSet Cross-Border Receipt v1",
+  "description": "Receipt for a single multi-currency commerce transaction. The buyer prices the order in their local currency; the rate is read from FxOracle on chain; escrow locks the ssUSD-equivalent. The on-chain deliveryReceiptHash binds the FX context so an auditor can prove the rate that was applied.",
+  "type": "object",
+  "required": ["schema", "buyerWallet", "sellerWallet", "orderId", "fxBinding", "txs", "finalStatus"],
+  "additionalProperties": false,
+  "properties": {
+    "schema":       { "const": "stateset.cross-border-receipt.v1" },
+    "buyerWallet":  { "$ref": "#/$defs/ethAddress" },
+    "sellerWallet": { "$ref": "#/$defs/ethAddress" },
+    "orderId":      { "$ref": "#/$defs/bytes32Hex" },
+    "fxBinding": {
+      "type": "object",
+      "required": ["pair", "pairId", "oracle", "rateE18", "rateHuman", "quoteUpdatedAt", "buyerAmountForeign", "buyerCurrency", "ssUsdAmount"],
+      "additionalProperties": false,
+      "properties": {
+        "pair":                 { "type": "string", "pattern": "^[A-Z]{2,8}/[A-Za-z]{2,8}$" },
+        "pairId":               { "$ref": "#/$defs/bytes32Hex" },
+        "oracle":               { "$ref": "#/$defs/ethAddress" },
+        "rateE18":              { "$ref": "#/$defs/uintString" },
+        "rateHuman":            { "type": "number", "exclusiveMinimum": 0 },
+        "quoteUpdatedAt":       { "type": "integer", "minimum": 0, "description": "Unix seconds when the quote was posted on chain." },
+        "buyerAmountForeign":   { "type": "number", "exclusiveMinimum": 0 },
+        "buyerCurrency":        { "type": "string", "pattern": "^[A-Z]{2,8}$" },
+        "buyerCurrencySymbol":  { "type": "string" },
+        "buyerCountry":         { "type": "string" },
+        "ssUsdAmount":          { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "txs": {
+      "type": "object",
+      "required": ["lock", "release"],
+      "additionalProperties": false,
+      "properties": {
+        "lock":    { "$ref": "#/$defs/txHash" },
+        "release": { "$ref": "#/$defs/txHash" }
+      }
+    },
+    "finalStatus": { "enum": ["None", "Locked", "Delivered", "Disputed", "Released", "Refunded"] }
+  },
+  "$defs": {
+    "ethAddress": { "type": "string", "pattern": "^0x[0-9a-fA-F]{40}$" },
+    "bytes32Hex": { "type": "string", "pattern": "^0x[0-9a-fA-F]{64}$" },
+    "txHash":     { "type": "string", "pattern": "^0x[0-9a-fA-F]{64}$" },
+    "uintString": { "type": "string", "pattern": "^[0-9]+$" }
+  }
+}

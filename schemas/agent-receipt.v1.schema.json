@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stateset.com/schemas/agent-receipt.v1.json",
+  "title": "StateSet Agent Receipt v1",
+  "description": "Verifiable record of a single agent-to-agent commerce transaction settled through OrderEscrow with a STARK proof anchored on SetRegistry. Every transaction hash, batch ID, and proof hash in this document is independently checkable on Set Chain L2.",
+  "type": "object",
+  "required": ["schema", "issuedAt", "order", "parties", "payment", "sequencer", "starkProof", "anchor"],
+  "additionalProperties": false,
+  "properties": {
+    "schema":   { "const": "stateset.agent-receipt.v1" },
+    "issuedAt": { "type": "string", "format": "date-time" },
+    "order": {
+      "type": "object",
+      "required": ["id", "total", "currency"],
+      "additionalProperties": false,
+      "properties": {
+        "id":       { "type": "string", "minLength": 1, "description": "Off-chain order identifier (e.g. ORD-MOSWXX36)." },
+        "total":    { "type": "number", "exclusiveMinimum": 0 },
+        "currency": { "type": "string", "minLength": 2, "maxLength": 8 }
+      }
+    },
+    "parties": {
+      "type": "object",
+      "required": ["buyer", "seller"],
+      "additionalProperties": false,
+      "properties": {
+        "buyer":  { "$ref": "#/$defs/party" },
+        "seller": { "$ref": "#/$defs/party" }
+      }
+    },
+    "payment": {
+      "type": "object",
+      "required": ["intentId", "asset", "amountUnits", "tokenAddress", "signingHash", "signature", "chainId"],
+      "additionalProperties": false,
+      "properties": {
+        "intentId":         { "$ref": "#/$defs/bytes32Hex" },
+        "asset":            { "type": "string", "minLength": 2 },
+        "amountUnits":      { "$ref": "#/$defs/uintString" },
+        "tokenAddress":     { "$ref": "#/$defs/ethAddress" },
+        "signingHash":      { "$ref": "#/$defs/bytes32Hex" },
+        "signature":        { "type": "string", "pattern": "^0x[0-9a-fA-F]{130}$", "description": "secp256k1 65-byte signature." },
+        "settlementTx":     { "anyOf": [{ "$ref": "#/$defs/txHash" }, { "type": "null" }] },
+        "settlementBlock":  { "anyOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }] },
+        "chainId":          { "type": "integer", "minimum": 1 }
+      }
+    },
+    "escrow": {
+      "type": "object",
+      "description": "Optional. Present when the order used OrderEscrow (the default flow).",
+      "required": ["contract", "orderIdHash", "lockTx", "lockBlock", "deliveryReceiptHash", "deliverTx", "deliverBlock", "finalStatus"],
+      "additionalProperties": false,
+      "properties": {
+        "contract":            { "$ref": "#/$defs/ethAddress" },
+        "orderIdHash":         { "$ref": "#/$defs/bytes32Hex" },
+        "lockTx":              { "$ref": "#/$defs/txHash" },
+        "lockBlock":           { "type": "integer", "minimum": 0 },
+        "deliveryReceiptHash": { "$ref": "#/$defs/bytes32Hex" },
+        "deliverTx":           { "$ref": "#/$defs/txHash" },
+        "deliverBlock":        { "type": "integer", "minimum": 0 },
+        "releaseTx":           { "anyOf": [{ "$ref": "#/$defs/txHash" }, { "type": "null" }] },
+        "releaseBlock":        { "anyOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }] },
+        "finalStatus":         { "enum": ["None", "Locked", "Delivered", "Disputed", "Released", "Refunded"] },
+        "marketplace": {
+          "anyOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "required": ["feeRecipient", "feeBps"],
+              "additionalProperties": false,
+              "properties": {
+                "feeRecipient": { "$ref": "#/$defs/ethAddress" },
+                "feeBps":       { "type": "integer", "minimum": 0, "maximum": 1000 }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "sequencer": {
+      "type": "object",
+      "required": ["tenantId", "storeId", "batchId", "eventsRoot", "sequenceStart", "sequenceEnd"],
+      "additionalProperties": false,
+      "properties": {
+        "tenantId":      { "$ref": "#/$defs/uuid" },
+        "storeId":       { "$ref": "#/$defs/uuid" },
+        "batchId":       { "$ref": "#/$defs/bytes32Hex" },
+        "eventsRoot":    { "$ref": "#/$defs/bytes32Hex" },
+        "sequenceStart": { "type": "integer", "minimum": 0 },
+        "sequenceEnd":   { "type": "integer", "minimum": 0 }
+      }
+    },
+    "starkProof": {
+      "type": "object",
+      "required": ["policyId", "policyLimit", "policyHash", "proofHash", "proofSize", "provingTimeMs", "bundleHash"],
+      "additionalProperties": false,
+      "properties": {
+        "policyId":      { "enum": ["order_total.cap", "aml.threshold", "agent.authorization.v1"] },
+        "policyLimit":   { "type": "integer", "minimum": 1 },
+        "policyHash":    { "$ref": "#/$defs/bytes32Hex" },
+        "proofHash":     { "$ref": "#/$defs/bytes32Hex" },
+        "proofSize":     { "type": "integer", "minimum": 1 },
+        "provingTimeMs": { "type": "integer", "minimum": 0 },
+        "bundleHash":    { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" }
+      }
+    },
+    "anchor": {
+      "type": "object",
+      "required": ["registry", "anchorTx", "anchorBlock"],
+      "additionalProperties": false,
+      "properties": {
+        "registry":     { "$ref": "#/$defs/ethAddress" },
+        "paymentBatch": { "$ref": "#/$defs/ethAddress" },
+        "escrow":       { "$ref": "#/$defs/ethAddress" },
+        "anchorTx":     { "$ref": "#/$defs/txHash" },
+        "anchorBlock":  { "type": "integer", "minimum": 0 }
+      }
+    }
+  },
+  "$defs": {
+    "ethAddress": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{40}$",
+      "description": "20-byte EVM address, hex with 0x prefix; case-insensitive (no checksum required)."
+    },
+    "bytes32Hex": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{64}$",
+      "description": "32-byte value, hex with 0x prefix."
+    },
+    "txHash": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{64}$",
+      "description": "Ethereum transaction hash."
+    },
+    "uintString": {
+      "type": "string",
+      "pattern": "^[0-9]+$",
+      "description": "Decimal-string-encoded unsigned integer (used for token amounts that may exceed JS safe integer range)."
+    },
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "party": {
+      "type": "object",
+      "required": ["agentId", "wallet"],
+      "additionalProperties": false,
+      "properties": {
+        "agentId": { "$ref": "#/$defs/uuid" },
+        "wallet":  { "$ref": "#/$defs/ethAddress" }
+      }
+    }
+  }
+}

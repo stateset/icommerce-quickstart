@@ -1,0 +1,22 @@
+# Node
+node_modules/
+npm-debug.log
+
+# Foundry
+contracts/cache/
+contracts/out/
+contracts/broadcast/
+contracts/lib/
+
+# Stack runtime
+stack/.run/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Local env
+.env
+.env.local

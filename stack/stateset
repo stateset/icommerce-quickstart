@@ -1,0 +1,185 @@
+#!/usr/bin/env bash
+# stateset — local-stack orchestrator for the icommerce-quickstart repo.
+#
+#   stateset up            anvil + deploy + seed FX + bridges → ready
+#   stateset down          stop anvil + bridges
+#   stateset status        what's running, what's stale
+#   stateset deploy        forge script DeployLocal --broadcast
+#   stateset seed-fx       post EUR/GBP/JPY/MXN quotes to FxOracle
+#   stateset bridges       start both bridges in the background
+#   stateset bridges:stop  stop them
+#   stateset demo <name>   lifecycle | realmoney | verify
+#   stateset test          contracts (forge) + bridges (node --test) + demos (syntax)
+#   stateset doctor        health check; --fix to auto-remediate
+#
+# Most commands are thin wrappers around forge / node / curl. The point is
+# discoverability + a single entry point, not novel behavior.
+
+set -uo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+RPC="${RPC:-http://localhost:8545}"
+PIDDIR="$ROOT/stack/.run"
+mkdir -p "$PIDDIR"
+
+# Colors (only for terminal)
+if [ -t 1 ]; then
+  G=$'\033[32m'; R=$'\033[31m'; Y=$'\033[33m'; C=$'\033[36m'; D=$'\033[2m'; B=$'\033[1m'; X=$'\033[0m'
+else
+  G= R= Y= C= D= B= X=
+fi
+
+usage() {
+  cat <<EOF
+${B}stateset${X} — local-stack orchestrator
+
+  ${C}up${X}                start anvil + deploy + seed FX + bridges
+  ${C}down${X}              stop anvil + bridges
+  ${C}status${X}            what's running, what's stale
+
+  ${C}deploy${X}            forge script DeployLocal --broadcast
+  ${C}seed-fx${X}           refresh EUR/GBP/JPY/MXN quotes on FxOracle
+  ${C}bridges${X}           start on-ramp + off-ramp bridges (background)
+  ${C}bridges:stop${X}      stop them
+  ${C}demo <name>${X}       lifecycle | realmoney | verify
+
+  ${C}test${X}              contracts + bridges + demos
+  ${C}doctor${X} [--fix]    health check; --fix auto-remediates
+
+Env: RPC=${RPC}
+EOF
+}
+
+ok()  { echo -e "  ${G}✓${X} $*"; }
+bad() { echo -e "  ${R}✗${X} $*"; }
+warn(){ echo -e "  ${Y}!${X} $*"; }
+info(){ echo -e "  ${C}→${X} $*"; }
+
+# ─── primitives ──────────────────────────────────────────────────────────
+anvil_up()    { curl -s -o /dev/null -w '%{http_code}' -X POST "$RPC" -H 'Content-Type: application/json' --data '{"jsonrpc":"2.0","method":"eth_chainId","id":1}' --max-time 2 | grep -q '^200$'; }
+port_busy()   { lsof -i ":$1" -sTCP:LISTEN -t >/dev/null 2>&1; }
+running_pid() { [ -f "$PIDDIR/$1.pid" ] && kill -0 "$(cat "$PIDDIR/$1.pid")" 2>/dev/null; }
+
+# ─── commands ────────────────────────────────────────────────────────────
+case "${1:-}" in
+  ""|-h|--help|help) usage ;;
+
+  up)
+    if anvil_up; then ok "anvil already up"
+    else
+      info "starting anvil…"
+      anvil --chain-id 84532001 >"$PIDDIR/anvil.log" 2>&1 &
+      echo $! > "$PIDDIR/anvil.pid"
+      for _ in $(seq 1 20); do anvil_up && break; sleep 0.2; done
+      anvil_up && ok "anvil started (chain 84532001)" || { bad "anvil failed to start"; exit 1; }
+    fi
+    "$0" deploy
+    "$0" seed-fx
+    "$0" bridges
+    echo
+    ok "stack is up. try: ${B}$0 demo lifecycle${X}"
+    ;;
+
+  down)
+    "$0" bridges:stop
+    if running_pid anvil; then info "stopping anvil…"; kill "$(cat "$PIDDIR/anvil.pid")"; rm -f "$PIDDIR/anvil.pid"; ok "anvil stopped"; fi
+    ;;
+
+  status)
+    anvil_up        && ok "anvil $RPC" || bad "anvil $RPC"
+    running_pid on-ramp  && ok "on-ramp bridge :4242"  || warn "on-ramp bridge down"
+    running_pid off-ramp && ok "off-ramp bridge :4243" || warn "off-ramp bridge down"
+    [ -f "$ROOT/contracts/broadcast/DeployLocal.s.sol/84532001/run-latest.json" ] \
+      && ok "contracts deployed"  || warn "contracts not deployed (run: $0 deploy)"
+    ;;
+
+  deploy)
+    cd "$ROOT/contracts"
+    [ -d lib/forge-std ] || { info "installing forge-std + openzeppelin libs…"; forge install --no-git foundry-rs/forge-std OpenZeppelin/openzeppelin-contracts OpenZeppelin/openzeppelin-contracts-upgradeable >/dev/null 2>&1; }
+    info "deploying contracts to $RPC…"
+    forge script script/DeployLocal.s.sol --rpc-url "$RPC" --broadcast --skip-simulation >"$PIDDIR/deploy.log" 2>&1 \
+      && ok "contracts deployed (see contracts/broadcast/)" \
+      || { bad "deploy failed; tail of log:"; tail -20 "$PIDDIR/deploy.log"; exit 1; }
+    ;;
+
+  seed-fx)
+    # Re-post the 4 default FX quotes (EUR/GBP/JPY/MXN per ssUSD). Quotes
+    # have a 1h TTL on chain — the canonical "refresh quotes" op when the
+    # off-ramp's `--currency JPY` etc. starts failing with "FX quote stale".
+    bcast="$ROOT/contracts/broadcast/DeployLocal.s.sol/84532001/run-latest.json"
+    if [ ! -f "$bcast" ]; then bad "contracts not deployed; run: $0 deploy"; exit 1; fi
+    fx=$(python3 -c "import json;d=json.load(open('$bcast'));print([t['contractAddress'] for t in d['transactions'] if t['contractName']=='FxOracle'][0])")
+    SEQ_KEY="${SEQUENCER_KEY:-0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d}"
+    info "re-seeding FX quotes on $fx"
+    posted=0
+    # rates: EUR=1.0625 GBP=1.2700 JPY=0.0064 MXN=0.0590 (ssUSD per unit foreign), 18-decimal scaled
+    for entry in "EUR/ssUSD:1062500000000000000" "GBP/ssUSD:1270000000000000000" "JPY/ssUSD:6400000000000000" "MXN/ssUSD:59000000000000000"; do
+      pair="${entry%:*}"; rate="${entry##*:}"
+      pid=$(cast keccak "$pair")
+      if cast send "$fx" "postQuote(bytes32,uint256,uint64)" "$pid" "$rate" 3600 \
+           --rpc-url "$RPC" --private-key "$SEQ_KEY" >/dev/null 2>&1; then
+        ok "$pair → rate $(cast --to-unit "$rate" 18) ssUSD/unit, TTL 1h"
+        posted=$((posted+1))
+      else
+        bad "$pair failed"
+      fi
+    done
+    [ "$posted" -eq 4 ] && ok "posted $posted/4 quotes" || warn "posted only $posted/4"
+    ;;
+
+  bridges)
+    cd "$ROOT/bridges"
+    [ -d node_modules ] || { info "installing bridge deps…"; npm install --silent; }
+    if running_pid on-ramp; then ok "on-ramp already running"; else
+      info "starting on-ramp…"
+      RPC_URL="$RPC" PORT=4242 nohup node on-ramp.mjs >"$PIDDIR/on-ramp.log" 2>&1 &
+      echo $! > "$PIDDIR/on-ramp.pid"
+      sleep 1; running_pid on-ramp && ok "on-ramp started :4242" || { bad "on-ramp failed"; tail -10 "$PIDDIR/on-ramp.log"; }
+    fi
+    if running_pid off-ramp; then ok "off-ramp already running"; else
+      info "starting off-ramp…"
+      RPC_URL="$RPC" PORT=4243 nohup node off-ramp.mjs >"$PIDDIR/off-ramp.log" 2>&1 &
+      echo $! > "$PIDDIR/off-ramp.pid"
+      sleep 1; running_pid off-ramp && ok "off-ramp started :4243" || { bad "off-ramp failed"; tail -10 "$PIDDIR/off-ramp.log"; }
+    fi
+    ;;
+
+  bridges:stop)
+    for b in on-ramp off-ramp; do
+      if running_pid "$b"; then info "stopping $b…"; kill "$(cat "$PIDDIR/$b.pid")" 2>/dev/null; rm -f "$PIDDIR/$b.pid"; ok "$b stopped"; fi
+    done
+    ;;
+
+  demo)
+    name="${2:-}"; [ -z "$name" ] && { echo "usage: stateset demo {lifecycle|realmoney|verify}"; exit 2; }
+    cd "$ROOT/demos"
+    [ -d node_modules ] || { info "installing demo deps…"; npm install --silent; }
+    case "$name" in
+      lifecycle) exec node escrow-lifecycle.mjs ;;
+      realmoney) exec node realmoney-loop.mjs ;;
+      verify)    exec node verify-receipt.mjs "${@:3}" ;;
+      *)         echo "unknown demo: $name (lifecycle|realmoney|verify)"; exit 2 ;;
+    esac
+    ;;
+
+  test)
+    info "contracts (forge test)…"
+    (cd "$ROOT/contracts" && forge test 2>&1 | tail -10)
+    info "bridges (node --test)…"
+    (cd "$ROOT/bridges" && npm test 2>&1 | tail -8)
+    info "demo syntax check…"
+    (cd "$ROOT/demos" && node --check escrow-lifecycle.mjs && node --check realmoney-loop.mjs && node --check verify-receipt.mjs && ok "demos syntax OK")
+    ;;
+
+  doctor)
+    fix=0; [ "${2:-}" = "--fix" ] && fix=1
+    anvil_up && ok "anvil $RPC" || { bad "anvil down"; [ $fix = 1 ] && warn "doctor --fix can't start anvil for you (privileged); run: $0 up"; }
+    [ -f "$ROOT/contracts/broadcast/DeployLocal.s.sol/84532001/run-latest.json" ] \
+      && ok "contracts deployed" || { warn "contracts not deployed"; [ $fix = 1 ] && "$0" deploy; }
+    running_pid on-ramp  && ok "on-ramp"  || { warn "on-ramp down"; [ $fix = 1 ] && "$0" bridges; }
+    running_pid off-ramp && ok "off-ramp" || warn "off-ramp down"
+    command -v ves-stark >/dev/null && ok "ves-stark on PATH" || warn "ves-stark not on PATH (set STARK_BIN if you have it)"
+    ;;
+
+  *) echo "unknown command: $1"; usage; exit 2 ;;
+esac

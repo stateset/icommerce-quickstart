@@ -1,0 +1,19 @@
+{
+  "name": "stateset-icommerce-demos",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Runnable demos that exercise the StateSet iCommerce stack end-to-end.",
+  "scripts": {
+    "lifecycle": "node escrow-lifecycle.mjs",
+    "realmoney": "node realmoney-loop.mjs",
+    "verify":    "node verify-receipt.mjs"
+  },
+  "dependencies": {
+    "ethers": "^6.13.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,53 @@
+{
+  "schema": "stateset.agent-receipt.v1",
+  "issuedAt": "2026-05-05T00:34:49.250Z",
+  "order": {
+    "id": "ORD-MORWBWY6",
+    "total": 1697.85,
+    "currency": "USD"
+  },
+  "parties": {
+    "buyer": {
+      "agentId": "da857fce-a781-40ce-9ce9-5113f0214ec9",
+      "wallet": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC"
+    },
+    "seller": {
+      "agentId": "742422fc-18a6-4ec0-8ed3-f40c34be5439",
+      "wallet": "0x90F79bf6EB2c4f870365E785982E1f101E93b906"
+    }
+  },
+  "payment": {
+    "intentId": "0x3249ac2ae7c03426d0e6a3bca7752f7aea7b37b6cacfa9c861d86778a03ebe14",
+    "asset": "ssUSD",
+    "amountUnits": "1697850000",
+    "tokenAddress": "0xb7f8bc63bbcad18155201308c8f3540b07f84f5e",
+    "signingHash": "0x1e25cd34d0a12c6c73a351411ce040628f72999309c4b3f863702653b6506ede",
+    "signature": "0xa8713b8eefec1c06ff490f80e51eb7df5998ecf6c88dd05637a888ca79b06d5e3b62ebb6a43a3ad7cde785b0635a927f4545466ba720f1568cc1e04a6a766e521c",
+    "settlementTx": "0x12b80647e8aa9e572dec80f007c729547585486a99170e59b3befbe1c16da63a",
+    "settlementBlock": 9862,
+    "chainId": 84532001
+  },
+  "sequencer": {
+    "tenantId": "c3a1b2d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+    "storeId": "f1e2d3c4-b5a6-4798-8a9b-0c1d2e3f4a5b",
+    "batchId": "0x57a0ec52a6527947070f6782330bdb4c5050c07262d015936c7ba84d10c94610",
+    "eventsRoot": "0x40ea2a730fa37993a2c81eba152557426b14a6b1166b0f2c75ec7e742bf4fc3d",
+    "sequenceStart": 1,
+    "sequenceEnd": 1
+  },
+  "starkProof": {
+    "policyId": "order_total.cap",
+    "policyLimit": 100000000000,
+    "policyHash": "0xda89d68c5c2a99059ee9725e6c823a29d7049bea6b0eac9f4514c1603248def4",
+    "proofHash": "0x2865a037223a1b772f3941b2bc526b0318342320f5bb4ee28d40c6ca04a199b0",
+    "proofSize": 74039,
+    "provingTimeMs": 32,
+    "bundleHash": "de58ea53c001ab80ea31a4c34f5a73ecd8e2a7084b44cd309026afaa66d79240"
+  },
+  "anchor": {
+    "registry": "0x610178da211fef7d417bc0e6fed39f05609ad788",
+    "paymentBatch": "0x0dcd1bf9a1b36ce34237eeafef220932846bcd82",
+    "anchorTx": "0x62a62d6aca6600916d82bf8f41296a586b52958032ae0985dc71d43606cb354d",
+    "anchorBlock": 9864
+  }
+}

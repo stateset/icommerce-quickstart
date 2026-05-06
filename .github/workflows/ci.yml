@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  contracts:
+    name: contracts (foundry)
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: contracts } }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+      - name: forge install (pinned versions)
+        run: |
+          forge install foundry-rs/forge-std --no-commit
+          forge install OpenZeppelin/openzeppelin-contracts@v5.0.0 --no-commit
+          forge install OpenZeppelin/openzeppelin-contracts-upgradeable@v5.0.0 --no-commit
+      - name: forge build
+        run: forge build --skip test
+      - name: forge test
+        run: forge test -vvv --no-match-path 'lib/**'
+
+  bridges:
+    name: bridges (node --test)
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: bridges } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - run: npm install
+      - run: npm test
+
+  demos:
+    name: demos (syntax + verify on bundled fixture)
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: demos } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - run: npm install
+      - name: syntax-check
+        run: |
+          node --check escrow-lifecycle.mjs
+          node --check realmoney-loop.mjs
+          node --check verify-receipt.mjs
+          bash -n audit-with-cast.sh

@@ -1,0 +1,37 @@
+# StateSet iCommerce — Foundry config (quickstart layout)
+[profile.default]
+src = "."
+out = "out"
+libs = ["lib"]
+test = "test"
+script = "script"
+cache_path = "cache"
+skip = ["lib/**/certora/**", "lib/**/test/**", "lib/**/scripts/**", "lib/**/fv/**"]
+
+remappings = [
+    "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+    "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+    "forge-std/=lib/forge-std/src/",
+]
+
+solc_version = "0.8.20"
+optimizer = true
+optimizer_runs = 100
+via_ir = true
+evm_version = "cancun"
+
+verbosity = 3
+fuzz = { runs = 256, max_test_rejects = 65536 }
+
+[fmt]
+line_length = 100
+tab_width = 4
+bracket_spacing = true
+quote_style = "double"
+number_underscore = "thousands"
+
+[rpc_endpoints]
+sepolia = "${SEPOLIA_RPC_URL}"
+
+[etherscan]
+sepolia = { key = "${ETHERSCAN_API_KEY}" }

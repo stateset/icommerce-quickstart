@@ -1,0 +1,19 @@
+{
+  "name": "stateset-icommerce-bridges",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Fiat ↔ SSDC bridges for the StateSet iCommerce stack — Stripe webhook on-ramp + Stripe Treasury off-ramp.",
+  "scripts": {
+    "start:on-ramp": "node on-ramp.mjs",
+    "start:off-ramp": "node off-ramp.mjs",
+    "test": "node --test tests/on-ramp.test.mjs tests/off-ramp.test.mjs"
+  },
+  "dependencies": {
+    "ethers": "^6.16.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}
