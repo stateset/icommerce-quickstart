@@ -15,7 +15,10 @@ Prerequisites: [Foundry](https://book.getfoundry.sh/) (`anvil`, `forge`, `cast`)
 ```bash
 git clone https://github.com/stateset/icommerce-quickstart && cd icommerce-quickstart
 
-# 1. Bring everything up: anvil + install Solidity deps + deploy + bridges
+# 0. One-time: install Solidity + Node deps
+bash stack/setup.sh
+
+# 1. Bring everything up: anvil + deploy + bridges
 ./stack/stateset up
 
 # 2. Watch the protocol settle a $1500 order end-to-end

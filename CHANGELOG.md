@@ -5,24 +5,37 @@ All notable changes to this project will be documented in this file. Format foll
 ## [Unreleased]
 
 ### Added
-- Initial repo: contracts, bridges, demos, schemas, `stack/stateset` CLI orchestrator, docs
-- 6 Solidity contracts (OrderEscrow, FxOracle, SetRegistry, SSDC, NAVOracle, SetPaymaster) + Foundry config + Sepolia deploy script
-- Multi-currency fiat ↔ SSDC bridges (USD/EUR/GBP/JPY/MXN) with HMAC + secp256k1 + cross-chain replay rejection
-- 3 runnable demos: `escrow-lifecycle`, `realmoney-loop`, `verify-receipt`
-- Bundled fixture receipt for offline verification
-- 3 JSON Schemas (agent-receipt, compliance-bundle, cross-border-receipt)
-- `stack/stateset` CLI with `up | down | deploy | bridges | demo | test | doctor | seed-fx`
-- CI workflow gating contracts (forge build + test), bridges (node --test), demos (syntax check)
-- Per-directory READMEs
+- `stack/setup.sh` — one-shot first-time setup (forge install + npm install for bridges + demos). Idempotent.
+- `stateset version` subcommand — prints CLI version + paths + versions of forge / node / cast.
+- `stateset doctor` now checks tooling (forge, node, cast), Solidity dependencies (forge-std, openzeppelin), schemas, and `STARK_BIN` before runtime checks.
+- `contracts/test/SetRegistry.t.sol` — adds coverage for prevStateRoot chaining, batch commit/finalize, STARK proof metadata. CI green at `0725129`.
+
+### Changed
+- README's 5-minute start now includes `bash stack/setup.sh` as a one-time step — so the repo is genuinely runnable from a fresh clone.
+
+## [0.1.0] — 2026-05-06
+
+Initial public release. CI green at [`0725129`](https://github.com/stateset/icommerce-quickstart/commit/0725129); release at [`releases/tag/v0.1.0`](https://github.com/stateset/icommerce-quickstart/releases/tag/v0.1.0).
+
+### Added
+- Repo scaffold: `contracts/`, `bridges/`, `demos/`, `schemas/`, `stack/`, `docs/`, top-level READMEs.
+- 6 Solidity contracts (OrderEscrow, FxOracle, SetRegistry, SSDC, NAVOracle, SetPaymaster) + `MockSsUSD` + Foundry config + `DeployLocal` + `DeploySepolia`.
+- Fiat ↔ SSDC bridges with multi-currency support (USD/EUR/GBP/JPY/MXN) — HMAC verification on the on-ramp, secp256k1-signed payout requests on the off-ramp, cross-chain + cross-currency replay rejection bound into the canonical message.
+- Three runnable demos: `escrow-lifecycle` (~120-line ethers-only), `realmoney-loop` (full multi-currency cycle), `verify-receipt` (independent audit). Plus `audit-with-cast.sh` (pure shell + jq + cast).
+- Three JSON Schemas: agent-receipt.v1, compliance-bundle.v1, cross-border-receipt.v1.
+- `stack/stateset` CLI: `up | down | deploy | bridges | demo | test | doctor | seed-fx`.
+- CI workflow with three jobs (contracts, bridges, demos).
+- `CONTRIBUTING.md` documenting in-scope vs upstream-monorepo work.
 
 ### Verified
-- `forge build` clean, `forge test` 20/20 passing (13 OrderEscrow + 7 FxOracle)
-- `npm test` in bridges 35/35 passing (HMAC + signature + replay + multi-currency, no chain required)
-- `node --check` clean across all demos
-- `bash -n` clean on `stack/stateset` and `audit-with-cast.sh`
+- `forge build` + `forge test` 20/20 passing (13 OrderEscrow + 7 FxOracle).
+- `npm test` in `bridges/` 35/35 passing (HMAC + signature + replay + multi-currency, no chain required).
+- `node --check` clean across all demos.
+- `bash -n` clean on `stack/stateset` and `audit-with-cast.sh`.
+- CI green on contracts + bridges + demos jobs.
 
-### What's not in (deliberately, see README)
-- Sequencer (lives in `stateset/stateset-sequencer`)
-- `ves-stark` CLI (lives in `stateset/stateset-starks`)
-- MCP tools, admin UI, sync engine (live in `stateset/icommerce-app` monorepo)
-- Receipt-producer (depends on the sequencer + sync engine; this repo verifies, doesn't produce)
+### Not in this repo (by design)
+- **Sequencer** — Rust service; lives in [`stateset/stateset-sequencer`](https://github.com/stateset/stateset-sequencer).
+- **`ves-stark` CLI** — Winterfell verifier; lives in [`stateset/stateset-starks`](https://github.com/stateset/stateset-starks).
+- **MCP tools, admin UI, sync engine** — live in the [`stateset/icommerce-app`](https://github.com/stateset/icommerce-app) monorepo.
+- **Receipt-producer** — depends on the sequencer + sync engine; this repo verifies, doesn't produce.
