@@ -5,10 +5,12 @@ All notable changes to this project will be documented in this file. Format foll
 ## [Unreleased]
 
 ### Added
+- `contracts/test/NAVOracle.t.sol` — 27 tests covering attestor authorization, NAV staleness, history bounds, and SSDC integration. Verified locally: **27/27 passing**.
 - `stack/setup.sh` — one-shot first-time setup (forge install + npm install for bridges + demos). Idempotent.
 - `stateset version` subcommand — prints CLI version + paths + versions of forge / node / cast.
 - `stateset doctor` now checks tooling (forge, node, cast), Solidity dependencies (forge-std, openzeppelin), schemas, and `STARK_BIN` before runtime checks.
 - `contracts/test/SetRegistry.t.sol` — adds coverage for prevStateRoot chaining, batch commit/finalize, STARK proof metadata. CI green at `0725129`.
+- README badges — CI status, latest release, license, Solidity version, Node version. Visible signal of "this works" at a glance.
 
 ### Changed
 - README's 5-minute start now includes `bash stack/setup.sh` as a one-time step — so the repo is genuinely runnable from a fresh clone.

@@ -1,5 +1,11 @@
 # StateSet iCommerce — Quickstart
 
+[![CI](https://github.com/stateset/icommerce-quickstart/actions/workflows/ci.yml/badge.svg)](https://github.com/stateset/icommerce-quickstart/actions/workflows/ci.yml)
+[![Latest Release](https://img.shields.io/github/v/release/stateset/icommerce-quickstart?sort=semver)](https://github.com/stateset/icommerce-quickstart/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![Solidity](https://img.shields.io/badge/Solidity-0.8.20-363636?logo=solidity)](./contracts/foundry.toml)
+[![Node](https://img.shields.io/badge/Node-%E2%89%A520-339933?logo=node.js)](./bridges/package.json)
+
 A working **local stack** of the StateSet iCommerce protocol — contracts, bridges, demos, schemas — runnable on your machine in five minutes.
 
 > Verifiable agent commerce: a buyer's AI agent → x402 PaymentIntent → on-chain escrow → STARK-proven compliance → settlement → tamper-proof receipt. All audit-able from a cold start.
