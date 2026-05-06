@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: contracts } }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
       - name: forge install (pinned versions)
@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: bridges } }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with: { node-version: '20' }
       - run: npm install
@@ -42,7 +42,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: demos } }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with: { node-version: '20' }
       - run: npm install
