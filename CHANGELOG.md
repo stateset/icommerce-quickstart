@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file. Format foll
 ## [Unreleased]
 
 ### Added
+- `CODE_OF_CONDUCT.md` — Contributor Covenant 2.1.
+- `.github/CODEOWNERS` — auto-routes review.
+- **CI demos job now runs `escrow-lifecycle.mjs` end-to-end** against an in-CI anvil + freshly-deployed contracts. Catches ABI drift, ethers signature changes, contract revert paths, address-discovery bugs that `node --check` cannot. Closes the biggest reliability gap from the iter-7 self-grade.
+- `stateset bench` subcommand — wraps `forge test --gas-report` and prints the gas table. Useful when tuning a contract change.
 - `SECURITY.md` — disclosure policy, GitHub Security Advisories preferred, scope (in-this-repo vs upstream), 90-day public disclosure timeline, security-relevant context (OZ pin, key handling, replay-rejection bindings).
 - `stateset clean` subcommand — removes `cache/`, `out/`, `broadcast/`, `node_modules/`, and `.run/`. `--all` also removes `contracts/lib/` (the forge-installed Solidity deps).
 - `.github/ISSUE_TEMPLATE/` — structured bug-report + feature-request forms; the bug form prompts for `./stack/stateset doctor` output up front.

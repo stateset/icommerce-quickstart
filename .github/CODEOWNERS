@@ -1,0 +1,21 @@
+# Code owners for icommerce-quickstart.
+#
+# Auto-requests review from the listed owner(s) on every PR touching the
+# matched paths. Order matters — the *last* matching pattern wins.
+
+# Default owner for everything not covered below.
+*                                @domsteil
+
+# Solidity contracts — protocol-level review
+/contracts/                      @domsteil
+/contracts/script/DeploySepolia.s.sol  @domsteil
+
+# Bridges — security-relevant code (HMAC, signature verification, replay)
+/bridges/                        @domsteil
+
+# CI + automation
+/.github/                        @domsteil
+
+# Security policy + threat model
+/SECURITY.md                     @domsteil
+/docs/THREAT_MODEL.md            @domsteil

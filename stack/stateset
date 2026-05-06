@@ -44,6 +44,7 @@ ${B}stateset${X} — local-stack orchestrator
   ${C}demo <name>${X}       lifecycle | realmoney | verify
 
   ${C}test${X}              contracts + bridges + demos
+  ${C}bench${X}             forge gas reports for the deployed contracts
   ${C}doctor${X} [--fix]    health check; --fix auto-remediates
   ${C}version${X}           print versions of forge, node, cast, this CLI
   ${C}clean${X}             remove cache/, out/, broadcast/, node_modules/, run/
@@ -198,6 +199,15 @@ case "${1:-}" in
     (cd "$ROOT/bridges" && npm test 2>&1 | tail -8)
     info "demo syntax check…"
     (cd "$ROOT/demos" && node --check escrow-lifecycle.mjs && node --check realmoney-loop.mjs && node --check verify-receipt.mjs && ok "demos syntax OK")
+    ;;
+
+  bench)
+    # forge gas reports for the contracts named in foundry.toml's gas_reports
+    # list. Useful when tuning a contract change — diff the table against the
+    # previous run to see if you regressed.
+    info "running forge test --gas-report (this is slower than 'test')…"
+    (cd "$ROOT/contracts" && forge test --gas-report --no-match-path 'lib/**' 2>&1 | grep -E "^\| (src/|contracts/|test/|│ )" | head -120 || true)
+    ok "bench complete (above tables are gas usage per function call)"
     ;;
 
   doctor)

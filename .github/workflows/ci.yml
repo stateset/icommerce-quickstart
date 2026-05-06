@@ -38,17 +38,57 @@ jobs:
       - run: npm test
 
   demos:
-    name: demos (syntax + verify on bundled fixture)
+    name: demos (syntax + escrow-lifecycle e2e)
     runs-on: ubuntu-latest
-    defaults: { run: { working-directory: demos } }
     steps:
       - uses: actions/checkout@v6
+
       - uses: actions/setup-node@v6
         with: { node-version: '20' }
-      - run: npm install
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: forge install (pinned versions)
+        working-directory: contracts
+        run: |
+          forge install foundry-rs/forge-std
+          forge install OpenZeppelin/openzeppelin-contracts@v5.0.0
+          forge install OpenZeppelin/openzeppelin-contracts-upgradeable@v5.0.0
+      - name: npm install
+        working-directory: demos
+        run: npm install
+
+      # Cheap syntax check first — fails fast on import errors.
       - name: syntax-check
+        working-directory: demos
         run: |
           node --check escrow-lifecycle.mjs
           node --check realmoney-loop.mjs
           node --check verify-receipt.mjs
           bash -n audit-with-cast.sh
+
+      # Real end-to-end: boot anvil → deploy → run escrow-lifecycle.mjs.
+      # Catches the class of bugs that `node --check` cannot — ABI drift,
+      # ethers signature changes, contract revert paths, address-discovery bugs.
+      - name: Boot anvil (background)
+        run: |
+          anvil --chain-id 84532001 --silent &
+          echo $! > /tmp/anvil.pid
+          for _ in $(seq 1 30); do
+            if curl -sf -X POST http://localhost:8545 \
+              -H 'Content-Type: application/json' \
+              --data '{"jsonrpc":"2.0","method":"eth_chainId","id":1}' >/dev/null; then
+              echo "anvil up"; exit 0
+            fi
+            sleep 0.5
+          done
+          echo "anvil failed to start"; exit 1
+      - name: Deploy contracts
+        working-directory: contracts
+        run: forge script script/DeployLocal.s.sol --rpc-url http://localhost:8545 --broadcast --skip-simulation
+      - name: Run escrow-lifecycle demo end-to-end
+        working-directory: demos
+        run: node escrow-lifecycle.mjs
+      - name: Stop anvil
+        if: always()
+        run: kill "$(cat /tmp/anvil.pid 2>/dev/null)" 2>/dev/null || true
