@@ -1,0 +1,42 @@
+name: Feature request
+description: Suggest a new demo, contract test, CLI improvement, or bridge feature.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing: please skim [`CONTRIBUTING.md`](../blob/main/CONTRIBUTING.md)
+        — features that belong in the upstream `icommerce-app` monorepo
+        (sequencer, MCP tooling, admin UI, receipt-producer) won't land here.
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: What problem does this solve?
+    validations: { required: true }
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: A specific, small, testable change. Smaller is better.
+    validations: { required: true }
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Which area?
+      options:
+        - contracts (Solidity)
+        - bridges (on-ramp / off-ramp)
+        - demos
+        - schemas
+        - stack/stateset CLI
+        - docs
+        - CI
+    validations: { required: true }
+  - type: checkboxes
+    id: scope_check
+    attributes:
+      label: I've confirmed this is in scope
+      options:
+        - label: This is not the sequencer, MCP tooling, admin UI, or receipt-producer (those live upstream).
+          required: true

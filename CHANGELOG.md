@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file. Format foll
 ## [Unreleased]
 
 ### Added
+- `.github/ISSUE_TEMPLATE/` — structured bug-report + feature-request forms; the bug form prompts for `./stack/stateset doctor` output up front.
+- `.github/PULL_REQUEST_TEMPLATE.md` — checklist (test plan, CHANGELOG update, scope check).
+- `.github/dependabot.yml` — weekly npm + GitHub Actions dependency updates.
+- CI workflow now supports `workflow_dispatch` — re-run any time from the Actions tab without pushing.
 - `contracts/test/NAVOracle.t.sol` — 27 tests covering attestor authorization, NAV staleness, history bounds, and SSDC integration. Verified locally: **27/27 passing**.
 - `stack/setup.sh` — one-shot first-time setup (forge install + npm install for bridges + demos). Idempotent.
 - `stateset version` subcommand — prints CLI version + paths + versions of forge / node / cast.

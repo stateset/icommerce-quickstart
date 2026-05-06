@@ -1,0 +1,25 @@
+version: 2
+updates:
+  # Bridges + demos: npm
+  - package-ecosystem: npm
+    directory: /bridges
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels: [dependencies, bridges]
+  - package-ecosystem: npm
+    directory: /demos
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels: [dependencies, demos]
+  # CI itself
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    labels: [dependencies, ci]

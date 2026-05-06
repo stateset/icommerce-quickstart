@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Upstream platform issues
+    url: https://github.com/stateset/icommerce-app/issues
+    about: For sequencer, MCP, admin UI, or receipt-producer — file in the main monorepo.
+  - name: STARK verifier issues
+    url: https://github.com/stateset/stateset-starks/issues
+    about: For the ves-stark CLI binary — file in the stateset-starks repo.

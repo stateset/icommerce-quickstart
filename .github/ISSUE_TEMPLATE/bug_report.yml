@@ -1,0 +1,53 @@
+name: Bug report
+description: Something doesn't work the way the README says it does.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing an issue. Please run `./stack/stateset doctor` first
+        and paste the output below — it covers most "is my environment OK?"
+        questions in advance.
+  - type: input
+    id: command
+    attributes:
+      label: Command run
+      description: The exact command you ran.
+      placeholder: e.g. `./stack/stateset up`
+    validations: { required: true }
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+      description: Output, error messages, exit code.
+      render: shell
+    validations: { required: true }
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations: { required: true }
+  - type: textarea
+    id: doctor
+    attributes:
+      label: ./stack/stateset doctor output
+      render: shell
+  - type: input
+    id: os
+    attributes:
+      label: OS + arch
+      placeholder: e.g. macOS 14 (arm64), Ubuntu 22.04 (x64)
+    validations: { required: true }
+  - type: input
+    id: forge
+    attributes:
+      label: forge --version
+  - type: input
+    id: node
+    attributes:
+      label: node --version
+  - type: input
+    id: commit
+    attributes:
+      label: Commit / tag you're on
+      placeholder: e.g. v0.1.0 or main@8bbb344
