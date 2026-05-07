@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file. Format foll
 ## [Unreleased]
 
 ### Added
+- **`stateset completion <bash|zsh>`** — emits a shell-completion script to stdout. Tab-complete subcommand names, demo names, completion shells, and `.json` files for `audit`. Install with `eval "$(stateset completion bash)"` in `~/.bashrc` or write to `/etc/bash_completion.d/stateset`. Per-iter operator-quality polish; 19 subcommands deserves tab-complete.
 - **`stateset receipts`** — lists every receipt-shaped JSON in the repo (filtered by `schema: stateset.*` discriminator), with mtime/size. Pairs with `stateset audit <path>` for the find-then-verify operator workflow. Skips `node_modules/`, `contracts/lib/`, `cache/`, `out/`, `broadcast/`.
 - **`stateset audit [path]`** — tight alias for `node demos/verify-receipt.mjs`. Defaults to the bundled fixture if no path given. Three-keystroke way to verify a receipt you received over the wire.
 - **`stateset show`** — pretty-prints on-chain state of the deployed protocol (SSDC `totalSupply`, NAVOracle current NAV/share, FxOracle freshness + rate per supported pair). Complements `stateset status` (process-state) — `show` is the chain-state view. Useful when "demo failed" and you need to ask: was the FX quote stale? Did NAV update? What's the current SSDC supply?

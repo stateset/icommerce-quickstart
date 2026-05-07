@@ -55,6 +55,7 @@ ${B}stateset${X} — local-stack orchestrator
   ${C}doctor${X} [--fix]    health check; --fix auto-remediates
   ${C}version${X}           print versions of forge, node, cast, this CLI
   ${C}clean${X}             remove cache/, out/, broadcast/, node_modules/, run/
+  ${C}completion <shell>${X} emit shell completion (bash | zsh) to stdout
 
 Env: RPC=${RPC}
 EOF
@@ -90,6 +91,74 @@ case "${1:-}" in
       rm -rf "$ROOT/contracts/lib"
     fi
     ok "clean. next: ${B}bash stack/setup.sh${X}"
+    ;;
+
+  completion)
+    shell="${2:-}"
+    case "$shell" in
+      bash)
+        cat <<'EOF'
+# stateset bash completion
+# Install: eval "$(stateset completion bash)" in your ~/.bashrc
+# or:      stateset completion bash > /etc/bash_completion.d/stateset
+_stateset_completions() {
+  local cur="${COMP_WORDS[COMP_CWORD]}"
+  local prev="${COMP_WORDS[COMP_CWORD-1]}"
+  local subs="up down status show deploy deploy:sepolia seed-fx bridges bridges:stop demo audit receipts test gates bench bench:snapshot bench:diff doctor version clean completion help"
+  if [ "$COMP_CWORD" = 1 ]; then
+    COMPREPLY=( $(compgen -W "$subs" -- "$cur") )
+  elif [ "$prev" = "demo" ]; then
+    COMPREPLY=( $(compgen -W "lifecycle realmoney verify" -- "$cur") )
+  elif [ "$prev" = "completion" ]; then
+    COMPREPLY=( $(compgen -W "bash zsh" -- "$cur") )
+  elif [ "$prev" = "audit" ] || [ "$prev" = "demo verify" ]; then
+    COMPREPLY=( $(compgen -f -X '!*.json' -- "$cur") )
+  fi
+}
+complete -F _stateset_completions stateset
+EOF
+        ;;
+      zsh)
+        cat <<'EOF'
+# stateset zsh completion
+# Install: stateset completion zsh > ~/.zsh/completion/_stateset
+# (and ensure ~/.zsh/completion is on $fpath before compinit)
+#compdef stateset
+_stateset() {
+  local -a subs
+  subs=(
+    'up:start anvil + deploy + bridges'
+    'down:stop anvil + bridges'
+    'status:process state'
+    'show:on-chain state (SSDC supply, NAV, FX)'
+    'deploy:forge script DeployLocal --broadcast'
+    'deploy\:sepolia:forge script DeploySepolia --broadcast --verify'
+    'seed-fx:refresh FX quotes'
+    'bridges:start bridges'
+    'bridges\:stop:stop bridges'
+    'demo:lifecycle | realmoney | verify'
+    'audit:verify-receipt against a path'
+    'receipts:list every receipt JSON'
+    'test:contracts + bridges + demos'
+    'gates:non-chain CI preview'
+    'bench:gas reports'
+    'bench\:snapshot:regenerate .gas-snapshot'
+    'bench\:diff:diff against committed snapshot'
+    'doctor:health check'
+    'version:tool versions'
+    'clean:remove artifacts'
+    'completion:emit completion'
+  )
+  _describe 'stateset commands' subs
+}
+_stateset "$@"
+EOF
+        ;;
+      *)
+        echo "usage: stateset completion {bash|zsh}" >&2
+        exit 2
+        ;;
+    esac
     ;;
 
   version|--version|-v)
