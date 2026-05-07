@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+- `release.sh --dry-run` — runs preflight only, no tag/push/release. Closes the v0.2.0-shipping-with-placeholder-notes ergonomic trap.
+- `release.sh` now rejects obvious placeholder notes (`test`, `wip`, `tbd`, `dry-run`, etc., or fewer than 3 words). Pass real notes, or use `--dry-run` to verify preflight.
+- **`escrow-lifecycle` demo: 9 invariant assertions** at every state transition. Asserts buyer balance dropped by exactly `amount`, escrow received exactly `amount`, status=Locked. Asserts escrow still holds `amount` after `markDelivered`, status=Delivered. Asserts escrow drained, seller received `amount`, buyer net flow = `amount`, status=Released. The e2e CI step now catches contract bugs that don't revert but produce wrong balances — a class of failure `node --check` and even basic e2e couldn't catch before.
+
 ## [0.2.0] — 2026-05-07
 
 The "demos genuinely run in CI" release. Closes every iter-7 self-grade item that didn't require a clean VM.

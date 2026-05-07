@@ -25,6 +25,7 @@
 
 import fs from 'node:fs';
 import crypto from 'node:crypto';
+import { strict as assert } from 'node:assert';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import {
@@ -120,25 +121,47 @@ const lockTx = await escrowAsBuyer.lock(
 );
 const lockRcpt = await lockTx.wait();
 console.log(`   ✓ locked  tx ${lockRcpt.hash}  block ${lockRcpt.blockNumber}`);
-console.log(`   status:   ${STATUS[await escrowAsBuyer.statusOf(orderId)]}`);
+
+// Assertions after lock — buyer paid `amount`, escrow holds it, status=Locked
+const buyerAfterLock = await ssdc.balanceOf(buyer.address);
+const escrowAfterLock = await ssdc.balanceOf(escrowAddr);
+const statusAfterLock = await escrowAsBuyer.statusOf(orderId);
+assert.equal(buyerStart - buyerAfterLock, amount, 'buyer balance did not decrease by exactly `amount`');
+assert.equal(escrowAfterLock, amount, 'escrow did not receive exactly `amount`');
+assert.equal(statusAfterLock, 1n, `expected status=Locked(1), got ${STATUS[statusAfterLock]}(${statusAfterLock})`);
+console.log(`   ✓ buyer −${fmt(amount)}  escrow +${fmt(amount)}  status=Locked`);
 
 console.log(`\n3. buyer markDelivered (confirms receipt, w/ delivery-receipt hash)…`);
 const receiptHash = '0x' + crypto.createHash('sha256').update(`delivered:${orderId}`).digest('hex');
 const deliverTx = await escrowAsBuyer.markDelivered(orderId, receiptHash, { gasLimit: 200_000n, nonce: buyerNonce++ });
 const deliverRcpt = await deliverTx.wait();
 console.log(`   ✓ delivered  tx ${deliverRcpt.hash}  block ${deliverRcpt.blockNumber}`);
-console.log(`   status:      ${STATUS[await escrowAsBuyer.statusOf(orderId)]}`);
+
+// Assertions after markDelivered — funds still in escrow, status=Delivered
+const escrowAfterDeliver = await ssdc.balanceOf(escrowAddr);
+const statusAfterDeliver = await escrowAsBuyer.statusOf(orderId);
+assert.equal(escrowAfterDeliver, amount, 'escrow drained early — funds should remain until release');
+assert.equal(statusAfterDeliver, 2n, `expected status=Delivered(2), got ${STATUS[statusAfterDeliver]}(${statusAfterDeliver})`);
+console.log(`   ✓ escrow still holds ${fmt(amount)}  status=Delivered`);
 
 console.log(`\n4. seller release() (after confirmation window)…`);
 const releaseTx = await escrowAsSeller.release(orderId, { gasLimit: 300_000n });
 const releaseRcpt = await releaseTx.wait();
 console.log(`   ✓ released  tx ${releaseRcpt.hash}  block ${releaseRcpt.blockNumber}`);
-console.log(`   status:     ${STATUS[await escrowAsBuyer.statusOf(orderId)]}`);
 
+// Assertions after release — escrow empty, seller +amount, status=Released
 const buyerEnd  = await ssdc.balanceOf(buyer.address);
 const sellerEnd = await ssdc.balanceOf(seller.address);
+const escrowEnd = await ssdc.balanceOf(escrowAddr);
+const statusFinal = await escrowAsBuyer.statusOf(orderId);
+assert.equal(escrowEnd, 0n, 'escrow not drained on release');
+assert.equal(sellerEnd - sellerStart, amount, 'seller balance did not increase by exactly `amount`');
+assert.equal(buyerStart - buyerEnd, amount, 'buyer net flow ≠ `amount`');
+assert.equal(statusFinal, 4n, `expected status=Released(4), got ${STATUS[statusFinal]}(${statusFinal})`);
+console.log(`   ✓ escrow drained  seller +${fmt(amount)}  status=Released`);
+
 console.log(`\nAfter`);
 console.log(`  buyer  ${fmt(buyerEnd)} SSDC  (Δ ${fmt(buyerEnd - buyerStart)})`);
 console.log(`  seller ${fmt(sellerEnd)} SSDC  (Δ +${fmt(sellerEnd - sellerStart)})`);
 
-console.log(`\n✓ escrow lifecycle complete — buyer paid, seller paid, escrow at Released.\n`);
+console.log(`\n✓ escrow lifecycle complete — 8 invariants asserted: buyer paid, escrow held + drained, seller paid, statuses correct.\n`);

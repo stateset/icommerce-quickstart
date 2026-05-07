@@ -30,22 +30,25 @@ info() { echo -e "  ${B}->${X}    $*"; }
 TAG="${1:-}"
 NOTES_INLINE=""
 FORCE=0
+DRY_RUN=0
 shift || true
 while [ $# -gt 0 ]; do
   case "$1" in
-    --notes) NOTES_INLINE="$2"; shift 2 ;;
-    --force) FORCE=1; shift ;;
+    --notes)   NOTES_INLINE="$2"; shift 2 ;;
+    --force)   FORCE=1; shift ;;
+    --dry-run) DRY_RUN=1; shift ;;
     *) bad "unknown flag: $1"; exit 2 ;;
   esac
 done
 
 if [ -z "$TAG" ]; then
   cat <<EOF
-${B}usage:${X} bash scripts/release.sh <vX.Y.Z> [--notes "..." | --force]
+${B}usage:${X} bash scripts/release.sh <vX.Y.Z> [--notes "..."] [--dry-run] [--force]
 
   <vX.Y.Z>     New tag, e.g. v0.2.0 (must start with 'v')
   --notes      Inline release notes (else opens \$EDITOR)
-  --force      Skip CHANGELOG + CI green checks
+  --dry-run    Run preflight checks only — no tag, no push, no release
+  --force      Skip the CHANGELOG + CI-green soft checks
 EOF
   exit 2
 fi
@@ -94,8 +97,22 @@ elif [ $FORCE -ne 1 ]; then
   warn "gh not installed; skipping CI check"
 fi
 
+# Dry run stops here — preflight passed, no tagging
+if [ $DRY_RUN -eq 1 ]; then
+  ok "dry-run: all preflight checks passed; would tag + push + release ${TAG}"
+  exit 0
+fi
+
 # Notes
 if [ -n "$NOTES_INLINE" ]; then
+  # Reject obvious placeholder text — easy mistake to make and very ugly to recover from.
+  for placeholder in "test" "todo" "TBD" "tbd" "fixme" "FIXME" "draft" "DRAFT" "dry-run" "wip" "WIP"; do
+    if echo "$NOTES_INLINE" | grep -qiE "(^|\s)${placeholder}(\s|$)" || \
+       [ "$(echo "$NOTES_INLINE" | wc -w)" -lt 3 ]; then
+      bad "release notes look placeholder/short ('$NOTES_INLINE'). Pass real notes, or --dry-run to test."
+      exit 1
+    fi
+  done
   NOTES="$NOTES_INLINE"
 else
   TMP=$(mktemp)
