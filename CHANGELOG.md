@@ -4,13 +4,35 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
-### Added
-- **`stateset completion <bash|zsh>`** — emits a shell-completion script to stdout. Tab-complete subcommand names, demo names, completion shells, and `.json` files for `audit`. Install with `eval "$(stateset completion bash)"` in `~/.bashrc` or write to `/etc/bash_completion.d/stateset`. Per-iter operator-quality polish; 19 subcommands deserves tab-complete.
-- **`stateset receipts`** — lists every receipt-shaped JSON in the repo (filtered by `schema: stateset.*` discriminator), with mtime/size. Pairs with `stateset audit <path>` for the find-then-verify operator workflow. Skips `node_modules/`, `contracts/lib/`, `cache/`, `out/`, `broadcast/`.
-- **`stateset audit [path]`** — tight alias for `node demos/verify-receipt.mjs`. Defaults to the bundled fixture if no path given. Three-keystroke way to verify a receipt you received over the wire.
-- **`stateset show`** — pretty-prints on-chain state of the deployed protocol (SSDC `totalSupply`, NAVOracle current NAV/share, FxOracle freshness + rate per supported pair). Complements `stateset status` (process-state) — `show` is the chain-state view. Useful when "demo failed" and you need to ask: was the FX quote stale? Did NAV update? What's the current SSDC supply?
-- **`contracts/.gas-snapshot`** — committed gas-usage baseline (215 lines, one per test). PRs that change contract gas show as line diffs. Regenerate with `stateset bench:snapshot`; diff against current with `stateset bench:diff`.
-- **`stateset gates`** — runs the 5 non-chain CI gates locally in sequence: `forge fmt --check`, `forge build --sizes`, `forge test`, bridges `npm test`, demos syntax + `validate-fixture`. Mirrors the CI workflow exactly minus the e2e+chain steps (which `stateset test` covers if anvil is up). Run before `git push` to catch failures locally instead of waiting for the 5-minute CI round-trip. Verified 5/5 green on first run after iter-26.
+## [0.7.0] — 2026-05-07
+
+The "operator surface gets serious" release. v0.6.0 made the e2e gates strict; v0.7.0 makes the day-to-day operator-and-contributor experience first-class.
+
+### Added — operator commands
+- **`stateset show`** — chain-state view: SSDC `totalSupply`, NAVOracle current NAV/share, FxOracle freshness + rate per pair. Complements `status` (process-state). Useful when "demo failed at FX rate" and you need to know if the quote is stale.
+- **`stateset audit [path]`** — three-keystroke verifier wrapper. Defaults to the bundled fixture if no path given. Pair with `receipts` for find-then-verify.
+- **`stateset receipts`** — lists every receipt-shaped JSON in the repo (filtered by `schema: stateset.*` discriminator). Excludes `node_modules/`, `contracts/lib/`, build artifacts.
+- **`stateset completion <bash|zsh>`** — sourceable shell completion. Tab-completes 20 subcommands, demo names, and `.json` paths for `audit`.
+
+### Added — local CI parity
+- **`stateset gates`** — runs the 5 non-chain CI gates locally in sequence (`forge fmt --check`, `forge build --sizes`, `forge test`, bridges `npm test`, demos syntax + `validate-fixture`). Mirrors CI exactly minus chain-dependent steps. Catches failures locally instead of via 5-minute CI round-trip.
+- **`scripts/install-hooks.sh`** — opt-in pre-commit hook running `forge fmt --check` on staged Solidity, `node --check` on staged JS, `bash -n` on staged shell. Documented in CONTRIBUTING.md.
+- **`contracts/.gas-snapshot`** — committed 215-line gas-usage baseline. Regenerate with `stateset bench:snapshot`; diff with `stateset bench:diff`. PRs that touch contract gas show as line-by-line diffs.
+
+### Added — release tooling polish
+- `release.sh --dry-run` — preflight-only mode (catches release issues before committing to a tag).
+- `release.sh` placeholder rejection — refuses notes that are obviously placeholder text or shorter than 3 words.
+- `release.sh` distinguishes in-progress CI from gh-unreachable — refuses to release if a CI run is still pending on `main`.
+
+### Added — discoverability
+- README "Releases" table — visible cadence, links to each tag.
+- GitHub repo metadata: 10 topics (`solidity`, `foundry`, `ethereum`, `stablecoin`, `escrow`, `fx-oracle`, `multi-currency`, `quickstart`, `x402`, `agentic-commerce`) + homepage URL.
+- CONTRIBUTING.md documents the two-layer pre-push flow (hook + gates) and the gas-snapshot workflow.
+
+### Verified
+- All 20 subcommands work or bail gracefully on missing prereqs
+- 216/216 contract tests green; 35/35 bridge tests green; 17 invariant assertions hold across 3 e2e runs
+- All CI runs since v0.6.0 green on all 3 jobs
 
 ## [0.6.0] — 2026-05-07
 
