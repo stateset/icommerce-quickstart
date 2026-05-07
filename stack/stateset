@@ -44,6 +44,7 @@ ${B}stateset${X} — local-stack orchestrator
   ${C}bridges${X}           start on-ramp + off-ramp bridges (background)
   ${C}bridges:stop${X}      stop them
   ${C}demo <name>${X}       lifecycle | realmoney | verify
+  ${C}audit [path]${X}      verify-receipt against a path (default: bundled fixture)
 
   ${C}test${X}              contracts + bridges + demos
   ${C}gates${X}             run every non-chain CI gate locally (preview a push)
@@ -126,6 +127,17 @@ case "${1:-}" in
     running_pid off-ramp && ok "off-ramp bridge :4243" || warn "off-ramp bridge down"
     [ -f "$ROOT/contracts/broadcast/DeployLocal.s.sol/84532001/run-latest.json" ] \
       && ok "contracts deployed"  || warn "contracts not deployed (run: $0 deploy)"
+    ;;
+
+  audit)
+    # Tighter alias for `stateset demo verify <path>`. Defaults to the
+    # bundled fixture if no path given. Useful when you receive a receipt
+    # over the wire and want a one-liner check.
+    target="${2:-$ROOT/demos/fixtures/agent-receipt.json}"
+    if [ ! -f "$target" ]; then bad "no file at $target"; exit 1; fi
+    cd "$ROOT/demos"
+    [ -d node_modules ] || npm install --silent
+    exec node verify-receipt.mjs "$target"
     ;;
 
   show)
