@@ -4,12 +4,26 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-05-07
+
+The "multi-process e2e is now strict" release. v0.5.0 added two `realmoney-loop` runs to CI; v0.6.0 makes them assert protocol invariants at every phase boundary, not just "no tx reverted".
+
 ### Added
 - **8 invariant assertions in `realmoney-loop`** (parallel to iter-11's escrow-lifecycle work):
-  - **Phase 1**: buyer SSDC balance increased by exactly `ssUsdMinted`. Catches off-by-decimal mints, wrong-receiver mints, fee-skim bugs in the on-ramp.
-  - **Phase 2**: buyer net flow = `-orderTotal`, seller +`orderTotal`, escrow drained. Same invariants as escrow-lifecycle, but here over the multi-process flow.
-  - **Phase 3**: seller -`pulledSsdcWei`, bridge treasury +`pulledSsdcWei`, Stripe Treasury intent currency matches request, status='processing'. Catches FX-conversion bugs, wrong-currency intents, missing pulls.
-- The multi-process e2e CI gate (USD + JPY→GBP) is now strict — fails on wrong balances, not just on reverted txs. Same class of upgrade escrow-lifecycle got at iter-11.
+  - **Phase 1** (Stripe → SSDC mint): buyer SSDC balance increased by exactly `ssUsdMinted`. Catches off-by-decimal mints, wrong-receiver mints, on-ramp fee-skim bugs.
+  - **Phase 2** (escrow lifecycle): buyer net flow = -`orderTotal`, seller +`orderTotal`, escrow drained on release. Same invariants as escrow-lifecycle, but over the multi-process flow.
+  - **Phase 3** (SSDC → Stripe Treasury): seller balance Δ = pulled SSDC wei, bridge treasury Δ = pulled SSDC wei (delta — important for back-to-back runs), Stripe intent currency matches request, status = `processing`. Catches FX-conversion bugs, wrong-currency intents, missing pulls.
+- Both USD and JPY → GBP CI runs now check these assertions — meaning the FX path is also balance-checked end-to-end. If `FxOracle.convert` returns the wrong number on either ramp, Phase 1 or Phase 3 fails.
+
+### Fixed
+- Phase 3 bridge-balance assertion: initial implementation asserted `bridge balance == pulled`, which broke on the second consecutive realmoney-loop run (USD pull leaves SSDC in the bridge; JPY→GBP run sees 2216 SSDC instead of 1016). Real composition bug caught by the new gate on its first push, fixed within minutes: capture `bridgeBefore`, assert `(after - before) == pulled`. Same delta pattern that escrow-lifecycle uses for buyer/seller.
+
+### Verified
+- All 17 invariant assertions hold on both CI paths (9 in escrow-lifecycle + 8 in realmoney-loop ×2)
+- 216/216 contract tests still green
+- 35/35 bridge unit tests still green
+- All CI runs since v0.5.0 green on all 3 jobs
+- 6 releases in 32 hours, all CI-verified
 
 ## [0.5.0] — 2026-05-07
 
