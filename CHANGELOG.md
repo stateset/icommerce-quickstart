@@ -4,17 +4,35 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-05-07
+
+The "every commerce contract under test" release. Test count more than doubled (93 → 216) by lifting the upstream tests for the two contracts that had zero coverage in this quickstart.
+
 ### Added
-- `contracts/test/SetPaymaster.t.sol` (48 tests) — covers x402 batch settlement primitives, signature aggregation, paymaster role gating, pause/upgrade authorization, and gas-sponsorship paths.
-- `contracts/test/SetPaymentBatch.t.sol` (75 tests) — covers settlement nonce uniqueness, Merkle inclusion proofs, transfer-returns-false handling, batch lifecycle, asset configuration, and upgrade authorization.
-- **Test count: 93 → 216** (+123, ~2.3× growth). All pass locally; CI verifies on this push.
+- `contracts/test/SetPaymaster.t.sol` (48 tests) — x402 batch settlement primitives, signature aggregation, paymaster role gating, pause/upgrade authorization, gas-sponsorship paths.
+- `contracts/test/SetPaymentBatch.t.sol` (75 tests) — settlement nonce uniqueness, Merkle inclusion proofs, transfer-returns-false handling, batch lifecycle, asset configuration, upgrade authorization.
+- README "Releases" table — visible cadence, links to each tag.
+
+### Coverage matrix
+| Contract | Tests | Was |
+|---|---|---|
+| OrderEscrow | 13 | 13 |
+| FxOracle | 7 | 7 |
+| NAVOracle | 27 | 27 |
+| SetRegistry | 46 | 46 |
+| SetPaymaster | **48** | 0 |
+| SetPaymentBatch | **75** | 0 |
+| **Total** | **216** | 93 |
 
 ### Fixed
-- `realmoney-loop` demo — applied the iter-9 explicit-nonce pattern to phase-2 buyer txs (approve, lock, markDelivered) + phase-3 seller approve. Without this, the same ethers↔anvil nonce race that bit `escrow-lifecycle` in CI can hit anyone running this demo on a fast environment (especially CI). Same fix as iter-9: fetch nonce from chain at phase start, pass `nonce: ...` explicitly on every tx.
-- `release.sh`: distinguish **in-progress CI** from **gh-unreachable**. Previously a still-running CI run on `main` would silently warn-and-skip the green-CI check; now it refuses with a clear error and prints the `gh run watch` command to wait. Catches the case where you tag right after a push and the CI run hasn't completed yet.
+- `realmoney-loop` demo — applied the iter-9 explicit-nonce pattern to phase-2 buyer txs (approve, lock, markDelivered) + phase-3 seller approve. Same ethers↔anvil nonce-race fix as iter-9; makes the demo robust on fast environments (CI especially) before adding it to the e2e CI gate.
+- `release.sh` — distinguish **in-progress CI** from **gh-unreachable**. Previously a still-running run on `main` would silently warn-and-skip the green-CI check; now refuses with a clear error and prints the `gh run watch` command. Catches the case where you tag right after `git push` and CI hasn't completed yet.
 
-### Added
-- README "Releases" table — visible release cadence, links to each tag.
+### Verified
+- 216/216 contract tests green locally (13 OrderEscrow + 7 FxOracle + 27 NAVOracle + 46 SetRegistry + 48 SetPaymaster + 75 SetPaymentBatch).
+- 35/35 bridge unit tests green.
+- 9-invariant e2e demos CI step still green.
+- All CI runs since v0.3.0 (3/3) green on all 3 jobs.
 
 ## [0.3.0] — 2026-05-07
 
