@@ -497,6 +497,26 @@ EOF
       && ok "contracts deployed" || { warn "contracts not deployed"; [ $fix = 1 ] && "$0" deploy; }
     running_pid on-ramp  && ok "on-ramp"  || { warn "on-ramp down"; [ $fix = 1 ] && "$0" bridges; }
     running_pid off-ramp && ok "off-ramp" || warn "off-ramp down"
+    # FX freshness — quotes have a 1h TTL on chain; bridges fail with
+    # "FX quote stale" if any non-USD demo runs against a stale oracle.
+    bcast="$ROOT/contracts/broadcast/DeployLocal.s.sol/84532001/run-latest.json"
+    if [ -f "$bcast" ] && anvil_up && command -v cast >/dev/null; then
+      fx=$(python3 -c "import json;d=json.load(open('$bcast'));print([t['contractAddress'] for t in d['transactions'] if t['contractName']=='FxOracle'][0])" 2>/dev/null)
+      if [ -n "$fx" ]; then
+        stale_pairs=()
+        for pair in EUR/ssUSD GBP/ssUSD JPY/ssUSD MXN/ssUSD; do
+          pid=$(cast keccak "$pair")
+          fresh=$(cast call "$fx" "isFresh(bytes32)(bool)" "$pid" --rpc-url "$RPC" 2>/dev/null)
+          [ "$fresh" != "true" ] && stale_pairs+=("$pair")
+        done
+        if [ ${#stale_pairs[@]} -eq 0 ]; then
+          ok "FX quotes fresh (4/4 pairs)"
+        else
+          warn "FX quotes stale: ${stale_pairs[*]}"
+          if [ $fix = 1 ]; then "$0" seed-fx >/dev/null 2>&1 && ok "FX quotes re-seeded (auto-fix)" || warn "auto-seed failed"; fi
+        fi
+      fi
+    fi
     # Schemas + verifier
     [ -d "$ROOT/schemas" ] && ok "schemas/ present ($(ls "$ROOT/schemas/"*.schema.json 2>/dev/null | wc -l | tr -d ' ') files)" || bad "schemas/ missing"
     [ -n "${STARK_BIN:-}" ] && [ -x "$STARK_BIN" ] && ok "STARK_BIN=$STARK_BIN" \

@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+- `stateset doctor` now checks **FX-quote freshness per pair** (EUR/GBP/JPY/MXN). Stale quotes are reported by name; `--fix` auto-runs `seed-fx`. Closes a gap where doctor said "all clear" but a non-USD demo would then fail with "FX quote stale".
+
 ## [0.7.0] — 2026-05-07
 
 The "operator surface gets serious" release. v0.6.0 made the e2e gates strict; v0.7.0 makes the day-to-day operator-and-contributor experience first-class.
