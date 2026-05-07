@@ -69,6 +69,12 @@ const ssdc          = new Contract(ssdcAddr,   SSDC_ABI,   provider);
 const escrowAsBuyer = new Contract(escrowAddr, ESCROW_ABI, buyer);
 const escrowAsSeller = new Contract(escrowAddr, ESCROW_ABI, seller);
 
+// Note: in OrderEscrow.markDelivered, msg.sender must be the buyer or the
+// operator (i.e. the *recipient* confirms delivery, not the sender). That
+// matches escrow semantics — the seller can't unilaterally claim delivery.
+// So Step 3 below uses the buyer wallet, not the seller, even though the
+// narrative is "seller delivers".
+
 const STATUS = ['None', 'Locked', 'Delivered', 'Disputed', 'Released', 'Refunded'];
 const fmt = (wei) => Number(formatUnits(wei, 18)).toFixed(2);
 
@@ -92,8 +98,10 @@ const now = Math.floor(Date.now() / 1000);
 // pending-pool reporting in CI environments — we hit NONCE_EXPIRED here on
 // the first end-to-end CI run because lock used a stale nonce. Fetching
 // from chain after each wait() and passing explicitly removes the race.
-let buyerNonce  = await provider.getTransactionCount(buyer.address);
-let sellerNonce = await provider.getTransactionCount(seller.address);
+// Note: only buyer fires txs in this demo (markDelivered + release both
+// require msg.sender == buyer per OrderEscrow), so a single counter is
+// enough. Seller is a payee, not an actor.
+let buyerNonce = await provider.getTransactionCount(buyer.address);
 
 console.log(`\n1. buyer approves escrow as SSDC spender…`);
 await (await ssdcAsBuyer.approve(escrowAddr, amount, { nonce: buyerNonce++ })).wait();
@@ -106,22 +114,23 @@ const lockTx = await escrowAsBuyer.lock(
   ssdcAddr,
   amount,
   now + 7 * 86400,  // delivery deadline: 7 days
-  3 * 86400,        // confirmation window: 3 days
+  0,                // confirmation window: 0 → release fires instantly after
+                    //   buyer's own markDelivered (no dispute window needed)
   { gasLimit: 400_000n, nonce: buyerNonce++ }
 );
 const lockRcpt = await lockTx.wait();
 console.log(`   ✓ locked  tx ${lockRcpt.hash}  block ${lockRcpt.blockNumber}`);
 console.log(`   status:   ${STATUS[await escrowAsBuyer.statusOf(orderId)]}`);
 
-console.log(`\n3. seller markDelivered (with a delivery-receipt hash)…`);
+console.log(`\n3. buyer markDelivered (confirms receipt, w/ delivery-receipt hash)…`);
 const receiptHash = '0x' + crypto.createHash('sha256').update(`delivered:${orderId}`).digest('hex');
-const deliverTx = await escrowAsSeller.markDelivered(orderId, receiptHash, { gasLimit: 200_000n, nonce: sellerNonce++ });
+const deliverTx = await escrowAsBuyer.markDelivered(orderId, receiptHash, { gasLimit: 200_000n, nonce: buyerNonce++ });
 const deliverRcpt = await deliverTx.wait();
 console.log(`   ✓ delivered  tx ${deliverRcpt.hash}  block ${deliverRcpt.blockNumber}`);
 console.log(`   status:      ${STATUS[await escrowAsBuyer.statusOf(orderId)]}`);
 
-console.log(`\n4. buyer release()…`);
-const releaseTx = await escrowAsBuyer.release(orderId, { gasLimit: 300_000n, nonce: buyerNonce++ });
+console.log(`\n4. seller release() (after confirmation window)…`);
+const releaseTx = await escrowAsSeller.release(orderId, { gasLimit: 300_000n });
 const releaseRcpt = await releaseTx.wait();
 console.log(`   ✓ released  tx ${releaseRcpt.hash}  block ${releaseRcpt.blockNumber}`);
 console.log(`   status:     ${STATUS[await escrowAsBuyer.statusOf(orderId)]}`);
