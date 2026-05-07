@@ -88,8 +88,15 @@ const orderId = '0x' + crypto.randomBytes(32).toString('hex');
 const amount = parseUnits(ORDER_USD.toString(), 18);
 const now = Math.floor(Date.now() / 1000);
 
+// Explicit nonces. ethers' internal nonce tracking races with anvil's
+// pending-pool reporting in CI environments — we hit NONCE_EXPIRED here on
+// the first end-to-end CI run because lock used a stale nonce. Fetching
+// from chain after each wait() and passing explicitly removes the race.
+let buyerNonce  = await provider.getTransactionCount(buyer.address);
+let sellerNonce = await provider.getTransactionCount(seller.address);
+
 console.log(`\n1. buyer approves escrow as SSDC spender…`);
-await (await ssdcAsBuyer.approve(escrowAddr, amount)).wait();
+await (await ssdcAsBuyer.approve(escrowAddr, amount, { nonce: buyerNonce++ })).wait();
 console.log(`   ✓ approved $${ORDER_USD}`);
 
 console.log(`\n2. buyer locks $${ORDER_USD} into escrow (orderId ${orderId.slice(0, 18)}…)…`);
@@ -100,7 +107,7 @@ const lockTx = await escrowAsBuyer.lock(
   amount,
   now + 7 * 86400,  // delivery deadline: 7 days
   3 * 86400,        // confirmation window: 3 days
-  { gasLimit: 400_000n }
+  { gasLimit: 400_000n, nonce: buyerNonce++ }
 );
 const lockRcpt = await lockTx.wait();
 console.log(`   ✓ locked  tx ${lockRcpt.hash}  block ${lockRcpt.blockNumber}`);
@@ -108,13 +115,13 @@ console.log(`   status:   ${STATUS[await escrowAsBuyer.statusOf(orderId)]}`);
 
 console.log(`\n3. seller markDelivered (with a delivery-receipt hash)…`);
 const receiptHash = '0x' + crypto.createHash('sha256').update(`delivered:${orderId}`).digest('hex');
-const deliverTx = await escrowAsSeller.markDelivered(orderId, receiptHash, { gasLimit: 200_000n });
+const deliverTx = await escrowAsSeller.markDelivered(orderId, receiptHash, { gasLimit: 200_000n, nonce: sellerNonce++ });
 const deliverRcpt = await deliverTx.wait();
 console.log(`   ✓ delivered  tx ${deliverRcpt.hash}  block ${deliverRcpt.blockNumber}`);
 console.log(`   status:      ${STATUS[await escrowAsBuyer.statusOf(orderId)]}`);
 
 console.log(`\n4. buyer release()…`);
-const releaseTx = await escrowAsBuyer.release(orderId, { gasLimit: 300_000n });
+const releaseTx = await escrowAsBuyer.release(orderId, { gasLimit: 300_000n, nonce: buyerNonce++ });
 const releaseRcpt = await releaseTx.wait();
 console.log(`   ✓ released  tx ${releaseRcpt.hash}  block ${releaseRcpt.blockNumber}`);
 console.log(`   status:     ${STATUS[await escrowAsBuyer.statusOf(orderId)]}`);
