@@ -4,40 +4,43 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-05-06
+
+The "demos genuinely run in CI" release. Closes every iter-7 self-grade item that didn't require a clean VM.
+
 ### Added
-- `scripts/release.sh` — automates the tag → push → GitHub-release flow. Validates clean tree, on-`main`, in-sync, tag-doesn't-exist, CHANGELOG entry, latest CI green. `--force` to skip the soft checks.
-- `forge fmt --check` and `forge build --sizes` now run in CI's contracts job — catches unformatted contracts and surfaces contract-size growth in CI logs.
+- **CI demos job now runs `escrow-lifecycle.mjs` end-to-end** against an in-CI anvil + freshly-deployed contracts. Catches ABI drift, ethers signature changes, contract revert paths, address-discovery bugs that `node --check` cannot. The biggest reliability win from this release.
+- `forge fmt --check` and `forge build --sizes` in the contracts CI job — catches unformatted contracts and surfaces contract-size growth in CI logs.
+- `scripts/release.sh` — automates tag → push → GitHub-release flow. Validates clean tree, on-`main`, in-sync, tag-doesn't-exist, CHANGELOG entry, latest CI green. `--force` to skip the soft checks.
+- `stack/setup.sh` — one-shot first-time setup (forge install + npm install for bridges + demos). Idempotent.
+- New `stateset` subcommands: **`bench`** (gas-report wrapper), **`clean`** (artifact cleanup with `--all`), **`version`** (versions of forge/node/cast).
+- `stateset doctor` now checks tooling (forge, node, cast), Solidity deps (forge-std, openzeppelin), schemas, `STARK_BIN`.
+- `SECURITY.md` — full disclosure policy. GitHub Security Advisories preferred, scope split (this repo vs upstream sequencer/STARK/monorepo), 90-day disclosure clock.
 - `CODE_OF_CONDUCT.md` — Contributor Covenant 2.1.
 - `.github/CODEOWNERS` — auto-routes review.
-- **CI demos job now runs `escrow-lifecycle.mjs` end-to-end** against an in-CI anvil + freshly-deployed contracts. Catches ABI drift, ethers signature changes, contract revert paths, address-discovery bugs that `node --check` cannot. Closes the biggest reliability gap from the iter-7 self-grade.
-- `stateset bench` subcommand — wraps `forge test --gas-report` and prints the gas table. Useful when tuning a contract change.
-- `SECURITY.md` — disclosure policy, GitHub Security Advisories preferred, scope (in-this-repo vs upstream), 90-day public disclosure timeline, security-relevant context (OZ pin, key handling, replay-rejection bindings).
-- `stateset clean` subcommand — removes `cache/`, `out/`, `broadcast/`, `node_modules/`, and `.run/`. `--all` also removes `contracts/lib/` (the forge-installed Solidity deps).
-- `.github/ISSUE_TEMPLATE/` — structured bug-report + feature-request forms; the bug form prompts for `./stack/stateset doctor` output up front.
+- `.github/ISSUE_TEMPLATE/` — structured bug-report + feature-request forms; bug form prompts for `./stack/stateset doctor` output.
+- `.github/PULL_REQUEST_TEMPLATE.md` — checklist (test plan, CHANGELOG, scope).
+- `.github/dependabot.yml` — weekly npm + GitHub Actions dependency updates. Already merged 2 PRs (`actions/checkout` v4→v6, `actions/setup-node` v4→v6).
+- CI workflow `workflow_dispatch` trigger — re-run from the Actions tab without pushing.
+- README badges — CI status, latest release, license, Solidity, Node.
+- `contracts/test/SetRegistry.t.sol` (~1158 lines, 46 tests) — covers strict prevStateRoot chaining, batch commit/finalize, STARK proof metadata.
+- `contracts/test/NAVOracle.t.sol` (27 tests) — attestor authorization + revocation, NAV update sanity bounds, staleness/history bounds, SSDC integration.
 
 ### Fixed
-- **`escrow-lifecycle` demo** — caught two real bugs the moment the e2e CI step landed:
-  1. `NONCE_EXPIRED` race on the lock tx — fetch buyer/seller nonces from chain at script start and pass `nonce: ...` explicitly on every tx; removes the ethers↔anvil race in CI environments.
-  2. `markDelivered` was called from the seller wallet, but `OrderEscrow.markDelivered` requires `msg.sender == buyer || operator` (the recipient confirms delivery, not the sender — correct escrow semantics). Now buyer calls `markDelivered`, then seller calls `release` (which requires `msg.sender == seller || operator`). `confirmationWindow` set to 0 since no dispute window is needed when buyer attests directly.
+- **`escrow-lifecycle` demo** — caught and fixed by the new e2e CI gate on its first two runs:
+  1. `NONCE_EXPIRED` race on the lock tx — fetch nonces from chain at script start and pass `nonce: ...` explicitly on every tx; removes the ethers↔anvil race in CI environments.
+  2. `markDelivered` was called from the seller wallet, but `OrderEscrow.markDelivered` requires `msg.sender == buyer || operator` (recipient confirms delivery, not sender — correct escrow semantics). Now buyer calls `markDelivered`, then seller calls `release`. `confirmationWindow` set to 0 since no dispute window is needed when buyer attests directly.
 - `contracts/` — `forge fmt` reformatted 16 files (777+/852-, all cosmetic). 93 tests still pass.
-- `docs/ARCHITECTURE.md` and `docs/THREAT_MODEL.md` — replaced monorepo-only paths (`set/contracts/`, `ves-demo/`) with the quickstart's actual paths (`contracts/`, `bridges/`, `demos/`). Architecture doc now also explicitly enumerates the upstream repos (sequencer, stark, monorepo) it references.
-
-### Verified
-- 93 contract tests pass (13 OrderEscrow + 7 FxOracle + 27 NAVOracle + 46 SetRegistry).
-- 35 bridge unit tests pass (no chain required).
-- e2e demos CI step (anvil boot → forge install → deploy → run `escrow-lifecycle.mjs`) green at [`357c5ef`](https://github.com/stateset/icommerce-quickstart/commit/357c5ef).
-- `.github/PULL_REQUEST_TEMPLATE.md` — checklist (test plan, CHANGELOG update, scope check).
-- `.github/dependabot.yml` — weekly npm + GitHub Actions dependency updates.
-- CI workflow now supports `workflow_dispatch` — re-run any time from the Actions tab without pushing.
-- `contracts/test/NAVOracle.t.sol` — 27 tests covering attestor authorization, NAV staleness, history bounds, and SSDC integration. Verified locally: **27/27 passing**.
-- `stack/setup.sh` — one-shot first-time setup (forge install + npm install for bridges + demos). Idempotent.
-- `stateset version` subcommand — prints CLI version + paths + versions of forge / node / cast.
-- `stateset doctor` now checks tooling (forge, node, cast), Solidity dependencies (forge-std, openzeppelin), schemas, and `STARK_BIN` before runtime checks.
-- `contracts/test/SetRegistry.t.sol` — adds coverage for prevStateRoot chaining, batch commit/finalize, STARK proof metadata. CI green at `0725129`.
-- README badges — CI status, latest release, license, Solidity version, Node version. Visible signal of "this works" at a glance.
+- `docs/ARCHITECTURE.md` and `docs/THREAT_MODEL.md` — replaced monorepo-only paths (`set/contracts/`, `ves-demo/`) with this repo's paths. Architecture doc now also enumerates the upstream repos.
 
 ### Changed
-- README's 5-minute start now includes `bash stack/setup.sh` as a one-time step — so the repo is genuinely runnable from a fresh clone.
+- README's 5-minute start now includes `bash stack/setup.sh` as a one-time step. Test counts updated (47+ → 93).
+
+### Verified
+- **93 contract tests** pass (13 OrderEscrow + 7 FxOracle + 27 NAVOracle + 46 SetRegistry).
+- **35 bridge unit tests** pass (HMAC + signature + replay + multi-currency, no chain required).
+- **e2e demos CI step** (anvil boot → forge install → deploy → run `escrow-lifecycle.mjs`) green at [`357c5ef`](https://github.com/stateset/icommerce-quickstart/commit/357c5ef).
+- All 3 CI jobs green on `main` at release time.
 
 ## [0.1.0] — 2026-05-06
 
