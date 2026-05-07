@@ -62,8 +62,9 @@ That's it. You now have a working StateSet iCommerce stack on your machine.
 | **[`bridges/`](./bridges)** | Fiat ↔ SSDC bridges. Stripe webhook on-ramp + Stripe Treasury off-ramp. **35 unit tests pass standalone** (no chain required). Multi-currency: USD/EUR/GBP/JPY/MXN |
 | **[`demos/`](./demos)** | Three runnable demos:<br>• **`escrow-lifecycle`** — buyer locks, seller delivers, buyer releases (no sequencer, no STARK — just escrow)<br>• **`realmoney-loop`** — full fiat→SSDC→escrow→SSDC→fiat cycle, multi-currency<br>• **`verify-receipt`** — independent audit of any receipt |
 | **[`schemas/`](./schemas)** | The 3 JSON Schemas: agent-receipt.v1, compliance-bundle.v1, cross-border-receipt.v1 |
-| **[`stack/`](./stack)** | The `stateset` CLI orchestrator — single entry point for `up`, `down`, `deploy`, `demo`, `test`, `doctor` |
-| **[`docs/`](./docs)** | ARCHITECTURE.md, BRIDGES.md, THREAT_MODEL.md |
+| **[`stack/`](./stack)** | First-time `setup.sh` + the `stateset` CLI orchestrator (21 subcommands; see [CLI reference](#cli-reference)) |
+| **[`docs/`](./docs)** | ARCHITECTURE, BRIDGES, THREAT_MODEL, DEPLOY_SEPOLIA, EXAMPLE_RUN |
+| **[`scripts/`](./scripts)** | `release.sh` (tag → push → GitHub release) + `install-hooks.sh` (pre-commit) |
 
 ---
 
@@ -74,11 +75,13 @@ The simplest possible end-to-end test of the stack. ~120 lines of ethers + the d
 ```
 buyer wallet ──[approve]──► SSDC
 buyer wallet ──[lock]─────► OrderEscrow  (Status: Locked)
-seller wallet ─[markDelivered]► OrderEscrow  (Status: Delivered)
-buyer wallet ──[release]──► OrderEscrow  (Status: Released)
+buyer wallet ─[markDelivered]► OrderEscrow  (Status: Delivered)
+seller wallet ─[release]──► OrderEscrow  (Status: Released)
                                          │
                                          └──► seller receives SSDC
 ```
+
+> **Why the buyer marks delivered, not the seller**: `OrderEscrow.markDelivered` requires `msg.sender == buyer || operator` — recipient confirms delivery, not sender. The seller can't unilaterally claim delivery happened. Caught by the e2e CI gate in iter-9 of this repo's history.
 
 Run it:
 
