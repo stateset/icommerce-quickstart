@@ -4,11 +4,24 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-05-07
+
+The "multi-currency claim is now a test" release. The v0.4.0 release notes mentioned 5-currency support (USD/EUR/GBP/JPY/MXN) but no test exercised the FX path end-to-end — DeployLocal seeded quotes, but nothing ever read them via the bridges. v0.5.0 closes that gap.
+
 ### Added
-- **`realmoney-loop` (USD + multi-currency) now runs in e2e CI** — two e2e steps in the demos job after `escrow-lifecycle`:
-  1. USD path: full Stripe-webhook → SSDC mint → OrderEscrow → SSDC pull → Stripe Treasury cycle
-  2. **JPY → GBP path** (Tokyo buyer paying JPY, London seller withdrawing GBP) — exercises FxOracle reads on both ramps via the on-chain quote seeded by DeployLocal
-- Both bridges spawned as child processes, full multi-process orchestration tested. CI fails if any phase reverts. Closes the multi-currency-isn't-actually-tested gap that v0.4.0 release notes implicitly carried.
+- **`realmoney-loop` runs in e2e CI in two flavors** — both spawn the bridges as child processes and exercise the full Stripe-webhook → SSDC → escrow → SSDC-pull → Stripe Treasury cycle:
+  1. **USD path** (basic baseline)
+  2. **JPY → GBP path** — Tokyo buyer paying ¥235,000 JPY, London seller withdrawing £800 GBP. Reads `JPY/ssUSD` on the on-ramp and `GBP/ssUSD` on the off-ramp via the on-chain `FxOracle`. CI logs the actual converted amounts and tx hashes (`on-ramp mint`, `escrow lock`, `escrow release`, `off-ramp pull`).
+
+### Fixed
+- `release.sh` placeholder rejection: previous regex was a word-boundary check over the full notes text and falsely flagged real notes that mentioned `test` anywhere (e.g. "node --test" in usage instructions). Now narrower: reject only if first line is purely a placeholder token, or total notes < 3 words.
+- CI workflow YAML: quoted the demos job name (`syntax + e2e: escrow-lifecycle + realmoney-loop`) — the colon in the unquoted form made GitHub's YAML parser reject the entire workflow file. Iter-22 caught it on the next-to-last try.
+
+### Verified
+- Multi-currency cycle on live CI runner: `¥235,000 JPY → 1504.00 SSDC (rate 0.0064) → £800 GBP (1016.0 SSDC pulled, rate 1.27)`. Both rates pulled from the on-chain FxOracle; auditable from the run log.
+- 216/216 contract tests still green
+- 35/35 bridge unit tests still green
+- 9-invariant escrow-lifecycle e2e + 2 realmoney-loop e2e steps + schema validation all green on `09df525`
 
 ## [0.4.0] — 2026-05-07
 
