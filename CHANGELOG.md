@@ -5,6 +5,8 @@ All notable changes to this project will be documented in this file. Format foll
 ## [Unreleased]
 
 ### Added
+- `scripts/release.sh` — automates the tag → push → GitHub-release flow. Validates clean tree, on-`main`, in-sync, tag-doesn't-exist, CHANGELOG entry, latest CI green. `--force` to skip the soft checks.
+- `forge fmt --check` and `forge build --sizes` now run in CI's contracts job — catches unformatted contracts and surfaces contract-size growth in CI logs.
 - `CODE_OF_CONDUCT.md` — Contributor Covenant 2.1.
 - `.github/CODEOWNERS` — auto-routes review.
 - **CI demos job now runs `escrow-lifecycle.mjs` end-to-end** against an in-CI anvil + freshly-deployed contracts. Catches ABI drift, ethers signature changes, contract revert paths, address-discovery bugs that `node --check` cannot. Closes the biggest reliability gap from the iter-7 self-grade.
@@ -14,7 +16,16 @@ All notable changes to this project will be documented in this file. Format foll
 - `.github/ISSUE_TEMPLATE/` — structured bug-report + feature-request forms; the bug form prompts for `./stack/stateset doctor` output up front.
 
 ### Fixed
+- **`escrow-lifecycle` demo** — caught two real bugs the moment the e2e CI step landed:
+  1. `NONCE_EXPIRED` race on the lock tx — fetch buyer/seller nonces from chain at script start and pass `nonce: ...` explicitly on every tx; removes the ethers↔anvil race in CI environments.
+  2. `markDelivered` was called from the seller wallet, but `OrderEscrow.markDelivered` requires `msg.sender == buyer || operator` (the recipient confirms delivery, not the sender — correct escrow semantics). Now buyer calls `markDelivered`, then seller calls `release` (which requires `msg.sender == seller || operator`). `confirmationWindow` set to 0 since no dispute window is needed when buyer attests directly.
+- `contracts/` — `forge fmt` reformatted 16 files (777+/852-, all cosmetic). 93 tests still pass.
 - `docs/ARCHITECTURE.md` and `docs/THREAT_MODEL.md` — replaced monorepo-only paths (`set/contracts/`, `ves-demo/`) with the quickstart's actual paths (`contracts/`, `bridges/`, `demos/`). Architecture doc now also explicitly enumerates the upstream repos (sequencer, stark, monorepo) it references.
+
+### Verified
+- 93 contract tests pass (13 OrderEscrow + 7 FxOracle + 27 NAVOracle + 46 SetRegistry).
+- 35 bridge unit tests pass (no chain required).
+- e2e demos CI step (anvil boot → forge install → deploy → run `escrow-lifecycle.mjs`) green at [`357c5ef`](https://github.com/stateset/icommerce-quickstart/commit/357c5ef).
 - `.github/PULL_REQUEST_TEMPLATE.md` — checklist (test plan, CHANGELOG update, scope check).
 - `.github/dependabot.yml` — weekly npm + GitHub Actions dependency updates.
 - CI workflow now supports `workflow_dispatch` — re-run any time from the Actions tab without pushing.
