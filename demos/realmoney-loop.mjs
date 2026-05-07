@@ -252,6 +252,7 @@ try {
 
   const bridgeHealth = await fetch(`${OFF_RAMP_URL}/health`).then((r) => r.json());
   const bridgeTreasury = bridgeHealth.bridge_treasury;
+  const bridgeBefore = await ssdc.balanceOf(bridgeTreasury);  // captured before pull for delta-assertion
 
   // Seller pre-approves the bridge as SSDC spender
   const approveTx = await ssdcAsBuyer.connect(seller).approve(
@@ -294,14 +295,15 @@ try {
   console.log(`     ${C.dim}pull tx ${r.pull_tx.slice(0, 16)}…${C.reset}`);
   console.log(`     ${C.dim}Stripe Treasury intent: ${r.payout.id}  ${r.payout.currency.toUpperCase()} ${r.payout.amount}  ETA ${new Date(r.payout.expected_arrival_date * 1000).toISOString().slice(0, 10)}${C.reset}`);
 
-  // Phase 3 invariants: bridge treasury holds the pulled SSDC, seller
-  // balance dropped by exactly the pulled amount, Stripe Treasury intent
-  // shape is correct (currency matches request, status=processing).
+  // Phase 3 invariants: bridge treasury *delta* is the pulled amount
+  // (must use delta — when this demo runs back-to-back in CI, the bridge
+  // accumulates pulls across runs). Seller balance dropped by exactly the
+  // pulled amount. Stripe Treasury intent shape is correct.
   const pulledSsdcWei = BigInt(r.pull_amount_ssdc_units);
   const sellerAfterPayout = await ssdc.balanceOf(seller.address);
   const bridgeAfterPayout = await ssdc.balanceOf(bridgeTreasury);
   assert.equal(sellerAfterEscrow - sellerAfterPayout, pulledSsdcWei, `Phase 3: seller Δ ${fmt(sellerAfterEscrow - sellerAfterPayout)} ≠ ${fmt(pulledSsdcWei)} pulled`);
-  assert.equal(bridgeAfterPayout, pulledSsdcWei, `Phase 3: bridge balance ${fmt(bridgeAfterPayout)} ≠ ${fmt(pulledSsdcWei)} expected`);
+  assert.equal(bridgeAfterPayout - bridgeBefore, pulledSsdcWei, `Phase 3: bridge Δ ${fmt(bridgeAfterPayout - bridgeBefore)} ≠ ${fmt(pulledSsdcWei)} expected`);
   assert.equal(r.payout.currency.toUpperCase(), PAYOUT_CURRENCY, `Phase 3: Stripe intent currency ${r.payout.currency} ≠ ${PAYOUT_CURRENCY}`);
   assert.equal(r.payout.status, 'processing', `Phase 3: Stripe intent status ${r.payout.status} ≠ processing`);
   console.log(`     ${C.green}✓${C.reset} ${C.dim}seller −${fmt(pulledSsdcWei)} SSDC, bridge +${fmt(pulledSsdcWei)} SSDC, intent ${PAYOUT_CURRENCY}/processing (asserted)${C.reset}`);
