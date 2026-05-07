@@ -99,15 +99,21 @@ jobs:
         working-directory: demos
         run: node escrow-lifecycle.mjs
 
-      # realmoney-loop spawns the bridges as child processes — needs their
-      # node_modules installed too. USD path is the simplest (no FxOracle
-      # involvement); multi-currency e2e is a future iter.
+      # realmoney-loop spawns both bridges as child processes — needs their
+      # node_modules installed too.
       - name: Install bridges npm deps
         working-directory: bridges
         run: npm install
-      - name: Run realmoney-loop demo (USD) end-to-end
+      - name: Run realmoney-loop (USD) end-to-end
         working-directory: demos
         run: timeout 90 node realmoney-loop.mjs
+
+      # Multi-currency variant: Tokyo buyer paying JPY, London seller withdrawing
+      # GBP. Exercises FxOracle reads on both ramps. DeployLocal seeded the
+      # quotes with 1h TTL, so they're still fresh.
+      - name: Run realmoney-loop (JPY → GBP) end-to-end
+        working-directory: demos
+        run: timeout 90 node realmoney-loop.mjs --currency JPY --payout-currency GBP
 
       - name: Stop anvil
         if: always()

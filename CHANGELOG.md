@@ -5,7 +5,10 @@ All notable changes to this project will be documented in this file. Format foll
 ## [Unreleased]
 
 ### Added
-- **`realmoney-loop` (USD) now runs in e2e CI** — second e2e step in the demos job, after `escrow-lifecycle`. Spawns both bridges as child processes, runs the full Stripe-webhook → SSDC mint → OrderEscrow → SSDC pull → Stripe Treasury cycle, fails CI if any phase reverts. Multi-currency variants (`--currency JPY --payout-currency GBP`) are still local-only — future iter once timing/reliability is established.
+- **`realmoney-loop` (USD + multi-currency) now runs in e2e CI** — two e2e steps in the demos job after `escrow-lifecycle`:
+  1. USD path: full Stripe-webhook → SSDC mint → OrderEscrow → SSDC pull → Stripe Treasury cycle
+  2. **JPY → GBP path** (Tokyo buyer paying JPY, London seller withdrawing GBP) — exercises FxOracle reads on both ramps via the on-chain quote seeded by DeployLocal
+- Both bridges spawned as child processes, full multi-process orchestration tested. CI fails if any phase reverts. Closes the multi-currency-isn't-actually-tested gap that v0.4.0 release notes implicitly carried.
 
 ## [0.4.0] — 2026-05-07
 
