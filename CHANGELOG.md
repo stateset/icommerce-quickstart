@@ -4,14 +4,25 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-05-07
+
+The "every gate gets stricter" release. Builds on the v0.2.0 e2e gate by making it actually rigorous (9 invariant assertions), adds a fast schema-validation gate, makes testnet deploy operator-friendly, and hardens the release flow against the trap that bit me shipping v0.2.0.
+
 ### Added
-- `stateset deploy:sepolia` — production-shape testnet/mainnet deploy wrapper. Validates every required env var (DEPLOYER_PRIVATE_KEY, OWNER_ADDRESS, SEQUENCER_ADDRESS, ESCROW_OPERATOR_ADDRESS, FX_OPERATOR_ADDRESS, NAV_ATTESTOR_ADDRESS, TREASURY_ADDRESS, SEPOLIA_RPC_URL, ETHERSCAN_API_KEY); refuses to proceed if `OWNER_ADDRESS == deployer EOA` (production safety: upgrade authority must not equal deploying key); prints the full role assignment and prompts for `deploy` confirmation before running.
-- `docs/DEPLOY_SEPOLIA.md` — 7-step runbook covering env setup, confirmation, ownership-transfer to multi-sig (Step 4), FX seeding, smoke-test against Sepolia, deploy tagging, plus what the wrapper deliberately doesn't do (sequencer setup, bridge hosting, treasury-vault contract, NAV seeding).
-- `demos/validate-fixture.mjs` — JSON Schema 2020-12 validation of receipts against the schemas in this repo. Runs in CI as a fast gate (~10ms) so schema↔fixture drift is caught before the slow e2e path. Bundled fixture validates green.
-- `docs/EXAMPLE_RUN.md` — markdown transcript of the expected output for each `stateset` command (`up`, `demo lifecycle`, `doctor`, `test`, `demo realmoney`). Real "this works" signal a visitor can verify against their local run, without needing screen-recording infra. Closes the iter-7 grade item about visual proof. Linked from README's quick-start.
-- `release.sh --dry-run` — runs preflight only, no tag/push/release. Closes the v0.2.0-shipping-with-placeholder-notes ergonomic trap.
-- `release.sh` now rejects obvious placeholder notes (`test`, `wip`, `tbd`, `dry-run`, etc., or fewer than 3 words). Pass real notes, or use `--dry-run` to verify preflight.
-- **`escrow-lifecycle` demo: 9 invariant assertions** at every state transition. Asserts buyer balance dropped by exactly `amount`, escrow received exactly `amount`, status=Locked. Asserts escrow still holds `amount` after `markDelivered`, status=Delivered. Asserts escrow drained, seller received `amount`, buyer net flow = `amount`, status=Released. The e2e CI step now catches contract bugs that don't revert but produce wrong balances — a class of failure `node --check` and even basic e2e couldn't catch before.
+- **`escrow-lifecycle` demo: 9 invariant assertions** at every state transition. After `lock`: buyer balance dropped by exactly `amount`, escrow holds exactly `amount`, status=Locked. After `markDelivered`: escrow still holds `amount`, status=Delivered. After `release`: escrow drained, seller received `amount`, buyer net flow = -`amount`, status=Released. The e2e CI step now catches contract bugs that don't revert but produce wrong balances — a class of failure that lock-success + release-success alone could miss (fee-skim mistakes, off-by-one in amount, double-mint, drain on the wrong transition).
+- `demos/validate-fixture.mjs` — JSON Schema 2020-12 validation of receipts. Runs in CI as a fast (~10ms) gate before the slow e2e path. Catches schema↔fixture drift the moment it lands in a PR. Bundled fixture validates green.
+- `stateset deploy:sepolia` — production-shape testnet/mainnet deploy wrapper. Validates 9 required env vars, refuses to proceed if `OWNER_ADDRESS == deployer EOA` (production safety: upgrade authority must NOT equal deploying key), prints the role-assignment table, prompts for `deploy` confirmation, then runs `forge script DeploySepolia --broadcast --verify`.
+- `docs/DEPLOY_SEPOLIA.md` — 7-step runbook: env setup → verify-via-wrapper → deploy → hand off ownership to multi-sig (deliberately separate step 4, not step 3) → seed FX → smoke-test against Sepolia → tag the deploy. Plus a "What this doesn't do" section calling out sequencer/bridge/treasury concerns as separate.
+- `docs/EXAMPLE_RUN.md` — markdown transcript of expected output for each `stateset` command. Visual proof a visitor can verify against their local run on github.com without cloning. Linked from README's quick-start.
+- `release.sh --dry-run` — runs preflight only (clean tree, on-main, in-sync, tag-novel, CHANGELOG entry, CI green) without tagging/pushing/releasing. Verify preflight before committing to release.
+- `release.sh` rejects obvious placeholder notes (`test`, `wip`, `tbd`, `dry-run`, `draft`, etc.) and notes shorter than 3 words. Pass real notes, or use `--dry-run`.
+
+### Verified
+- 93/93 contract tests green
+- 35/35 bridge unit tests green (no chain required)
+- 9-invariant e2e demos CI step (anvil → forge install → deploy → run `escrow-lifecycle.mjs`) green at [`6981972`](https://github.com/stateset/icommerce-quickstart/commit/6981972) and at every push since
+- Schema-validation gate green on bundled fixture
+- All CI runs since v0.2.0 (4/4) green on all 3 jobs
 
 ## [0.2.0] — 2026-05-07
 
