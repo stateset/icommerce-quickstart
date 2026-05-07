@@ -40,7 +40,7 @@ jobs:
       - run: npm test
 
   demos:
-    name: demos (syntax + escrow-lifecycle e2e)
+    name: demos (syntax + e2e: escrow-lifecycle + realmoney-loop)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
