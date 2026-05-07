@@ -34,13 +34,13 @@ bash stack/setup.sh
 ./stack/stateset up
 
 # Optional but recommended: install the pre-commit hook
-# (runs forge fmt --check + node --check on staged files)
+# (runs forge fmt --check + node --check + bash -n on staged files)
 bash scripts/install-hooks.sh
 
-# Run all tests
+# Run all tests (with anvil up)
 ./stack/stateset test
 
-# Lint contracts
+# Lint contracts (covered by `stateset gates`)
 cd contracts && forge fmt --check
 cd ..
 
@@ -48,12 +48,32 @@ cd ..
 ./stack/stateset demo lifecycle
 ```
 
+## Before pushing
+
+Two layers of pre-push checks catch failures locally instead of waiting on the 5-minute CI round-trip:
+
+| Layer | Run by | What |
+|---|---|---|
+| **pre-commit hook** (`bash scripts/install-hooks.sh`) | `git commit` | Per-file: `forge fmt --check` on staged `.sol`, `node --check` on staged `.mjs`, `bash -n` on staged `.sh`. |
+| **`./stack/stateset gates`** | manual, before `git push` | Cross-file: `forge fmt --check` + `forge build --sizes` + `forge test` (216) + bridges `npm test` (35) + demos syntax + `validate-fixture`. Mirrors CI's non-chain steps exactly. |
+
+If both pass, your push will land green on contracts + bridges + demos jobs (modulo the e2e steps which need anvil). For the e2e steps, run `./stack/stateset test` with anvil up.
+
+If you're tuning a contract, also run:
+
+```bash
+./stack/stateset bench:diff      # see which tests' gas usage moved
+./stack/stateset bench:snapshot  # regenerate contracts/.gas-snapshot if intentional
+```
+
+Commit the new `.gas-snapshot` alongside the contract change so reviewers can see the gas delta in the PR.
+
 ## Pull requests
 
 1. Branch from `main`.
 2. Keep changes focused; one PR per logical change.
 3. Update `CHANGELOG.md` under `[Unreleased]` if your change is user-visible.
-4. Make sure `./stack/stateset test` passes locally.
+4. Make sure `./stack/stateset gates` passes (and `./stack/stateset test` if you have anvil up).
 5. CI must be green before merge.
 
 ## Commit messages
