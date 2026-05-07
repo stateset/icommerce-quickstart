@@ -86,13 +86,24 @@ if [ $FORCE -ne 1 ]; then
 fi
 
 # 6. CI green on HEAD (unless --force)
+# Distinguish three states: success (proceed), in-progress (refuse — wait
+# for it), failure/empty-and-no-gh-reachable (refuse / warn).
 if [ $FORCE -ne 1 ] && command -v gh >/dev/null; then
-  conclusion=$(gh run list --repo stateset/icommerce-quickstart --branch main --limit 1 --json conclusion -q '.[0].conclusion' 2>/dev/null || echo "")
-  case "$conclusion" in
-    success) ok "CI green on main" ;;
-    "")      warn "couldn't reach gh; skipping CI check" ;;
-    *)       bad "latest CI on main: $conclusion (not releasing without --force)"; exit 1 ;;
-  esac
+  ci_json=$(gh run list --repo stateset/icommerce-quickstart --branch main --limit 1 --json status,conclusion 2>/dev/null || echo "")
+  status=$(echo "$ci_json" | jq -r '.[0].status // ""' 2>/dev/null)
+  conclusion=$(echo "$ci_json" | jq -r '.[0].conclusion // ""' 2>/dev/null)
+  if [ -z "$ci_json" ] || [ "$ci_json" = "[]" ]; then
+    warn "couldn't reach gh or no runs found; skipping CI check"
+  elif [ "$status" != "completed" ]; then
+    bad "latest CI on main is $status (not yet completed); wait for it before releasing"
+    info "tip: gh run watch \$(gh run list --branch main --limit 1 --json databaseId -q '.[0].databaseId')"
+    exit 1
+  elif [ "$conclusion" = "success" ]; then
+    ok "CI green on main"
+  else
+    bad "latest CI on main: $conclusion (not releasing without --force)"
+    exit 1
+  fi
 elif [ $FORCE -ne 1 ]; then
   warn "gh not installed; skipping CI check"
 fi

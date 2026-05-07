@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Fixed
+- `release.sh`: distinguish **in-progress CI** from **gh-unreachable**. Previously a still-running CI run on `main` would silently warn-and-skip the green-CI check; now it refuses with a clear error and prints the `gh run watch` command to wait. Catches the case where you tag right after a push and the CI run hasn't completed yet.
+
+### Added
+- README "Releases" table — visible release cadence, links to each tag.
+
 ## [0.3.0] — 2026-05-07
 
 The "every gate gets stricter" release. Builds on the v0.2.0 e2e gate by making it actually rigorous (9 invariant assertions), adds a fast schema-validation gate, makes testnet deploy operator-friendly, and hardens the release flow against the trap that bit me shipping v0.2.0.
