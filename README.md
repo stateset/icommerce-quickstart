@@ -44,7 +44,8 @@ That's it. You now have a working StateSet iCommerce stack on your machine.
 
 | Tag | Date | Headline |
 |---|---|---|
-| **[v0.4.0](https://github.com/stateset/icommerce-quickstart/releases/tag/v0.4.0)** | 2026-05-07 | Every commerce contract under test — 216 tests (up from 93) |
+| **[v0.5.0](https://github.com/stateset/icommerce-quickstart/releases/tag/v0.5.0)** | 2026-05-07 | Multi-currency e2e is now a CI test — JPY→GBP cycle runs every push |
+| [v0.4.0](https://github.com/stateset/icommerce-quickstart/releases/tag/v0.4.0) | 2026-05-07 | Every commerce contract under test — 216 tests (up from 93) |
 | [v0.3.0](https://github.com/stateset/icommerce-quickstart/releases/tag/v0.3.0) | 2026-05-07 | Every gate gets stricter — 9 invariant assertions in e2e, schema-validation gate, `deploy:sepolia` wrapper |
 | [v0.2.0](https://github.com/stateset/icommerce-quickstart/releases/tag/v0.2.0) | 2026-05-07 | Demos genuinely run in CI |
 | [v0.1.0](https://github.com/stateset/icommerce-quickstart/releases/tag/v0.1.0) | 2026-05-06 | Initial release |
