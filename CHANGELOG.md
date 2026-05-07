@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file. Format foll
 ## [Unreleased]
 
 ### Added
+- **`stateset show`** — pretty-prints on-chain state of the deployed protocol (SSDC `totalSupply`, NAVOracle current NAV/share, FxOracle freshness + rate per supported pair). Complements `stateset status` (process-state) — `show` is the chain-state view. Useful when "demo failed" and you need to ask: was the FX quote stale? Did NAV update? What's the current SSDC supply?
 - **`contracts/.gas-snapshot`** — committed gas-usage baseline (215 lines, one per test). PRs that change contract gas show as line diffs. Regenerate with `stateset bench:snapshot`; diff against current with `stateset bench:diff`.
 - **`stateset gates`** — runs the 5 non-chain CI gates locally in sequence: `forge fmt --check`, `forge build --sizes`, `forge test`, bridges `npm test`, demos syntax + `validate-fixture`. Mirrors the CI workflow exactly minus the e2e+chain steps (which `stateset test` covers if anvil is up). Run before `git push` to catch failures locally instead of waiting for the 5-minute CI round-trip. Verified 5/5 green on first run after iter-26.
 

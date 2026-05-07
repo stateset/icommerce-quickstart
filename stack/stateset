@@ -35,7 +35,8 @@ ${B}stateset${X} — local-stack orchestrator
 
   ${C}up${X}                start anvil + deploy + seed FX + bridges
   ${C}down${X}              stop anvil + bridges
-  ${C}status${X}            what's running, what's stale
+  ${C}status${X}            what's running, what's stale (process state)
+  ${C}show${X}              on-chain state (SSDC supply, NAV, FX freshness)
 
   ${C}deploy${X}            forge script DeployLocal --broadcast (anvil)
   ${C}deploy:sepolia${X}    forge script DeploySepolia --broadcast --verify (testnet/mainnet)
@@ -125,6 +126,53 @@ case "${1:-}" in
     running_pid off-ramp && ok "off-ramp bridge :4243" || warn "off-ramp bridge down"
     [ -f "$ROOT/contracts/broadcast/DeployLocal.s.sol/84532001/run-latest.json" ] \
       && ok "contracts deployed"  || warn "contracts not deployed (run: $0 deploy)"
+    ;;
+
+  show)
+    # Pretty-print on-chain state — what the protocol THINKS (vs status,
+    # which only checks whether the daemons are up). Useful for debugging
+    # "demo failed" → was the FX quote stale? Did NAV update? Etc.
+    bcast="$ROOT/contracts/broadcast/DeployLocal.s.sol/84532001/run-latest.json"
+    if ! anvil_up; then bad "anvil down — start it first ($0 up)"; exit 1; fi
+    if [ ! -f "$bcast" ]; then bad "contracts not deployed"; exit 1; fi
+    if ! command -v cast >/dev/null; then bad "cast not on PATH"; exit 1; fi
+
+    # Pull addresses
+    fx=$(python3 -c "import json;d=json.load(open('$bcast'));print([t['contractAddress'] for t in d['transactions'] if t['contractName']=='FxOracle'][0])")
+    nav=$(python3 -c "import json;d=json.load(open('$bcast'));print([t['contractAddress'] for t in d['transactions'] if t['contractName']=='NAVOracle'][0])")
+    proxies=$(python3 -c "import json;d=json.load(open('$bcast'));print(' '.join([t['contractAddress'] for t in d['transactions'] if t['contractName']=='ERC1967Proxy']))")
+    ssdc=$(echo "$proxies" | awk '{print $4}')
+
+    echo -e "${B}Chain state${X} ${D}@ $RPC${X}"
+    echo -e "  ${C}block${X}             $(cast block-number --rpc-url "$RPC" 2>/dev/null || echo '?')"
+
+    # SSDC supply + NAV
+    if [ -n "$ssdc" ]; then
+      total=$(cast call "$ssdc" "totalSupply()(uint256)" --rpc-url "$RPC" 2>/dev/null | head -1)
+      echo -e "  ${C}SSDC${X}              $ssdc"
+      echo -e "    ${D}totalSupply${X}     $(cast --to-unit "$total" 18 2>/dev/null || echo '?') SSDC"
+    fi
+    if [ -n "$nav" ]; then
+      navper=$(cast call "$nav" "currentNavPerShare()(uint256)" --rpc-url "$RPC" 2>/dev/null | head -1)
+      echo -e "  ${C}NAVOracle${X}         $nav"
+      echo -e "    ${D}NAV/share${X}       \$$(cast --to-unit "$navper" 18 2>/dev/null || echo '?')"
+    fi
+
+    # FX freshness per pair
+    if [ -n "$fx" ]; then
+      echo -e "  ${C}FxOracle${X}          $fx"
+      for pair in EUR/ssUSD GBP/ssUSD JPY/ssUSD MXN/ssUSD; do
+        pid=$(cast keccak "$pair")
+        fresh=$(cast call "$fx" "isFresh(bytes32)(bool)" "$pid" --rpc-url "$RPC" 2>/dev/null)
+        if [ "$fresh" = "true" ]; then
+          rate_raw=$(cast call "$fx" "getQuote(bytes32)(uint256,uint64)" "$pid" --rpc-url "$RPC" 2>/dev/null | head -1)
+          rate=$(cast --to-unit "$rate_raw" 18 2>/dev/null || echo '?')
+          echo -e "    ${G}✓${X} ${pair} → $rate ssUSD/unit"
+        else
+          echo -e "    ${Y}!${X} ${pair} ${D}stale or unset${X}"
+        fi
+      done
+    fi
     ;;
 
   deploy)
