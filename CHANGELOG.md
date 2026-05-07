@@ -5,6 +5,8 @@ All notable changes to this project will be documented in this file. Format foll
 ## [Unreleased]
 
 ### Added
+- `stateset deploy:sepolia` — production-shape testnet/mainnet deploy wrapper. Validates every required env var (DEPLOYER_PRIVATE_KEY, OWNER_ADDRESS, SEQUENCER_ADDRESS, ESCROW_OPERATOR_ADDRESS, FX_OPERATOR_ADDRESS, NAV_ATTESTOR_ADDRESS, TREASURY_ADDRESS, SEPOLIA_RPC_URL, ETHERSCAN_API_KEY); refuses to proceed if `OWNER_ADDRESS == deployer EOA` (production safety: upgrade authority must not equal deploying key); prints the full role assignment and prompts for `deploy` confirmation before running.
+- `docs/DEPLOY_SEPOLIA.md` — 7-step runbook covering env setup, confirmation, ownership-transfer to multi-sig (Step 4), FX seeding, smoke-test against Sepolia, deploy tagging, plus what the wrapper deliberately doesn't do (sequencer setup, bridge hosting, treasury-vault contract, NAV seeding).
 - `demos/validate-fixture.mjs` — JSON Schema 2020-12 validation of receipts against the schemas in this repo. Runs in CI as a fast gate (~10ms) so schema↔fixture drift is caught before the slow e2e path. Bundled fixture validates green.
 - `docs/EXAMPLE_RUN.md` — markdown transcript of the expected output for each `stateset` command (`up`, `demo lifecycle`, `doctor`, `test`, `demo realmoney`). Real "this works" signal a visitor can verify against their local run, without needing screen-recording infra. Closes the iter-7 grade item about visual proof. Linked from README's quick-start.
 - `release.sh --dry-run` — runs preflight only, no tag/push/release. Closes the v0.2.0-shipping-with-placeholder-notes ergonomic trap.

@@ -37,7 +37,8 @@ ${B}stateset${X} — local-stack orchestrator
   ${C}down${X}              stop anvil + bridges
   ${C}status${X}            what's running, what's stale
 
-  ${C}deploy${X}            forge script DeployLocal --broadcast
+  ${C}deploy${X}            forge script DeployLocal --broadcast (anvil)
+  ${C}deploy:sepolia${X}    forge script DeploySepolia --broadcast --verify (testnet/mainnet)
   ${C}seed-fx${X}           refresh EUR/GBP/JPY/MXN quotes on FxOracle
   ${C}bridges${X}           start on-ramp + off-ramp bridges (background)
   ${C}bridges:stop${X}      stop them
@@ -130,6 +131,52 @@ case "${1:-}" in
     forge script script/DeployLocal.s.sol --rpc-url "$RPC" --broadcast --skip-simulation >"$PIDDIR/deploy.log" 2>&1 \
       && ok "contracts deployed (see contracts/broadcast/)" \
       || { bad "deploy failed; tail of log:"; tail -20 "$PIDDIR/deploy.log"; exit 1; }
+    ;;
+
+  deploy:sepolia|deploy-sepolia)
+    # Production-shape testnet/mainnet deploy. Requires every role address
+    # to be set explicitly via env so an ops team can hand each role to a
+    # multi-sig. We refuse to proceed without confirmation since this spends
+    # real ETH and (on mainnet) exposes the contracts publicly.
+    cd "$ROOT/contracts"
+    REQUIRED=(DEPLOYER_PRIVATE_KEY OWNER_ADDRESS SEQUENCER_ADDRESS ESCROW_OPERATOR_ADDRESS FX_OPERATOR_ADDRESS NAV_ATTESTOR_ADDRESS TREASURY_ADDRESS SEPOLIA_RPC_URL ETHERSCAN_API_KEY)
+    missing=()
+    for v in "${REQUIRED[@]}"; do
+      if [ -z "${!v:-}" ]; then missing+=("$v"); fi
+    done
+    if [ ${#missing[@]} -gt 0 ]; then
+      bad "missing required env vars:"
+      for v in "${missing[@]}"; do echo "      $v"; done
+      info "see contracts/script/DeploySepolia.s.sol header for descriptions"
+      exit 1
+    fi
+    # Refuse to deploy if OWNER == DEPLOYER — production safety: the role
+    # that authorizes upgrades must NOT be the same EOA that deploys.
+    deployer_addr=$(cast wallet address --private-key "$DEPLOYER_PRIVATE_KEY" 2>/dev/null || echo "")
+    if [ -n "$deployer_addr" ] && [ "${deployer_addr,,}" = "${OWNER_ADDRESS,,}" ]; then
+      bad "OWNER_ADDRESS == deployer address ($deployer_addr)"
+      info "production deploys must hand the OWNER role to a multi-sig, not the deployer EOA"
+      exit 1
+    fi
+    echo
+    echo -e "${B}About to deploy to Sepolia.${X}"
+    echo -e "  RPC URL:           ${SEPOLIA_RPC_URL}"
+    echo -e "  Deployer:          ${deployer_addr}"
+    echo -e "  Owner (admin):     ${OWNER_ADDRESS}"
+    echo -e "  Sequencer:         ${SEQUENCER_ADDRESS}"
+    echo -e "  Escrow operator:   ${ESCROW_OPERATOR_ADDRESS}"
+    echo -e "  FX operator:       ${FX_OPERATOR_ADDRESS}"
+    echo -e "  NAV attestor:      ${NAV_ATTESTOR_ADDRESS}"
+    echo -e "  Treasury:          ${TREASURY_ADDRESS}"
+    echo
+    read -p "Type 'deploy' to confirm, anything else to abort: " confirm
+    if [ "$confirm" != "deploy" ]; then bad "aborted"; exit 1; fi
+
+    info "running forge script DeploySepolia…"
+    forge script script/DeploySepolia.s.sol:DeploySepolia \
+      --rpc-url "$SEPOLIA_RPC_URL" --broadcast --verify \
+    && ok "Sepolia deploy submitted; check Etherscan for verification" \
+    || { bad "Sepolia deploy failed"; exit 1; }
     ;;
 
   seed-fx)
