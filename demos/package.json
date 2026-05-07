@@ -5,12 +5,15 @@
   "type": "module",
   "description": "Runnable demos that exercise the StateSet iCommerce stack end-to-end.",
   "scripts": {
-    "lifecycle": "node escrow-lifecycle.mjs",
-    "realmoney": "node realmoney-loop.mjs",
-    "verify":    "node verify-receipt.mjs"
+    "lifecycle":         "node escrow-lifecycle.mjs",
+    "realmoney":         "node realmoney-loop.mjs",
+    "verify":            "node verify-receipt.mjs",
+    "validate-fixture":  "node validate-fixture.mjs"
   },
   "dependencies": {
-    "ethers": "^6.13.0"
+    "ajv":         "^8.17.0",
+    "ajv-formats": "^3.0.1",
+    "ethers":      "^6.13.0"
   },
   "engines": {
     "node": ">=20"

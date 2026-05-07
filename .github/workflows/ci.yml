@@ -67,7 +67,14 @@ jobs:
           node --check escrow-lifecycle.mjs
           node --check realmoney-loop.mjs
           node --check verify-receipt.mjs
+          node --check validate-fixture.mjs
           bash -n audit-with-cast.sh
+
+      # Schema validation: catches schema↔fixture drift in milliseconds,
+      # before we spend 5 minutes on the e2e path.
+      - name: validate bundled fixture against schema
+        working-directory: demos
+        run: node validate-fixture.mjs
 
       # Real end-to-end: boot anvil → deploy → run escrow-lifecycle.mjs.
       # Catches the class of bugs that `node --check` cannot — ABI drift,

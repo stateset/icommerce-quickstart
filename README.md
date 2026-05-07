@@ -34,6 +34,8 @@ bash stack/setup.sh
 ./stack/stateset demo verify demos/fixtures/agent-receipt.json
 ```
 
+> Want to see what each command's output should look like before running? See [`docs/EXAMPLE_RUN.md`](./docs/EXAMPLE_RUN.md).
+
 That's it. You now have a working StateSet iCommerce stack on your machine.
 
 ---
