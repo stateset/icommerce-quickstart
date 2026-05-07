@@ -149,18 +149,41 @@ This repo is the **runnable protocol layer**. The platform layer lives upstream.
 
 ## CLI reference
 
+The `stateset` CLI has 21 subcommands. Tab-complete via `eval "$(stateset completion bash)"`.
+
 ```
-stateset up               start anvil + deploy + seed FX + bridges
-stateset down             stop anvil + bridges
-stateset status           what's running, what's stale
+# Lifecycle
+stateset up                     anvil + deploy + bridges → ready
+stateset down                   stop anvil + bridges
+stateset status                 process state (what's running)
+stateset show                   chain state (SSDC supply, NAV, FX freshness)
 
-stateset deploy           forge script DeployLocal --broadcast
-stateset bridges          start both bridges in the background
-stateset bridges:stop     stop them
-stateset demo <name>      lifecycle | realmoney | verify
+# Deploy
+stateset deploy                 forge script DeployLocal --broadcast (anvil)
+stateset deploy:sepolia         forge script DeploySepolia --broadcast --verify
+stateset seed-fx                refresh EUR/GBP/JPY/MXN quotes
 
-stateset test             contracts + bridges + demos
-stateset doctor [--fix]   health check; --fix auto-remediates
+# Bridges
+stateset bridges                start both bridges in the background
+stateset bridges:stop           stop them
+
+# Demos
+stateset demo <name>            lifecycle | realmoney | verify
+stateset audit [path]           verify-receipt against any *.json (default: bundled fixture)
+stateset receipts               list every receipt-shaped JSON in the repo
+
+# Test + bench
+stateset test                   contracts + bridges + demos
+stateset gates                  the 5 non-chain CI gates locally (preview a push)
+stateset bench                  forge gas reports
+stateset bench:snapshot         regenerate contracts/.gas-snapshot
+stateset bench:diff             diff current gas vs committed snapshot
+
+# Operator
+stateset doctor [--fix]         health check; --fix auto-remediates (incl. stale FX)
+stateset version                forge / node / cast versions
+stateset clean                  remove cache/, out/, broadcast/, node_modules/, .run/
+stateset completion <bash|zsh>  shell completion to stdout
 ```
 
 Set `RPC=http://your-rpc/` to point at a different chain.
