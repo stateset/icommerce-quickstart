@@ -16,10 +16,10 @@ pragma solidity ^0.8.20;
 ///      reference. Stale quotes are rejected on read; freshness is per-pair.
 contract FxOracle {
     struct Quote {
-        uint256 rate;        // quote-per-base-unit, 1e18 scale
-        uint64 updatedAt;    // unix seconds
-        uint64 ttl;          // seconds until quote is considered stale
-        address poster;      // who posted this quote
+        uint256 rate; // quote-per-base-unit, 1e18 scale
+        uint64 updatedAt; // unix seconds
+        uint64 ttl; // seconds until quote is considered stale
+        address poster; // who posted this quote
     }
 
     /// @notice The single trusted operator. v1 has one role; v2 splits
@@ -30,11 +30,7 @@ contract FxOracle {
     mapping(bytes32 => Quote) public quotes;
 
     event QuotePosted(
-        bytes32 indexed pair,
-        uint256 rate,
-        uint64 updatedAt,
-        uint64 ttl,
-        address poster
+        bytes32 indexed pair, uint256 rate, uint64 updatedAt, uint64 ttl, address poster
     );
 
     error NotOperator();
@@ -57,12 +53,8 @@ contract FxOracle {
         if (msg.sender != operator) revert NotOperator();
         if (rate == 0) revert ZeroRate();
         require(ttl > 0 && ttl <= 7 days, "bad ttl");
-        quotes[pair] = Quote({
-            rate: rate,
-            updatedAt: uint64(block.timestamp),
-            ttl: ttl,
-            poster: msg.sender
-        });
+        quotes[pair] =
+            Quote({ rate: rate, updatedAt: uint64(block.timestamp), ttl: ttl, poster: msg.sender });
         emit QuotePosted(pair, rate, uint64(block.timestamp), ttl, msg.sender);
     }
 

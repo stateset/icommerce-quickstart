@@ -45,10 +45,14 @@ contract NAVOracleTest is Test {
 
         // Deploy NAVOracle
         NAVOracle impl = new NAVOracle();
-        oracle = NAVOracle(address(new ERC1967Proxy(
-            address(impl),
-            abi.encodeCall(NAVOracle.initialize, (owner, attestor, MAX_STALENESS))
-        )));
+        oracle = NAVOracle(
+            address(
+                new ERC1967Proxy(
+                    address(impl),
+                    abi.encodeCall(NAVOracle.initialize, (owner, attestor, MAX_STALENESS))
+                )
+            )
+        );
 
         // Set SSDC
         oracle.setSSDC(address(mockSsUSD));
@@ -85,8 +89,8 @@ contract NAVOracleTest is Test {
 
         vm.prank(attestor);
         oracle.attestNAV(
-            1050 * 1e18,  // Total assets: $1050
-            20240101,      // Report date
+            1050 * 1e18, // Total assets: $1050
+            20_240_101, // Report date
             bytes32("proof123")
         );
 
@@ -94,7 +98,7 @@ contract NAVOracleTest is Test {
 
         assertEq(report.totalAssets, 1050 * 1e18);
         assertEq(report.totalShares, 1000 * 1e18);
-        assertEq(report.reportDate, 20240101);
+        assertEq(report.reportDate, 20_240_101);
         assertEq(report.attestor, attestor);
 
         // NAV per share: 1050 / 1000 = 1.05
@@ -106,7 +110,7 @@ contract NAVOracleTest is Test {
         mockSsUSD.setTotalShares(0);
 
         vm.prank(attestor);
-        oracle.attestNAV(1000 * 1e18, 20240101, bytes32(0));
+        oracle.attestNAV(1000 * 1e18, 20_240_101, bytes32(0));
 
         // Should use INITIAL_NAV_PER_SHARE
         assertEq(oracle.getCurrentNAVPerShare(), 1e18);
@@ -117,11 +121,11 @@ contract NAVOracleTest is Test {
 
         // First attestation
         vm.prank(attestor);
-        oracle.attestNAV(1000 * 1e18, 20240101, bytes32(0));
+        oracle.attestNAV(1000 * 1e18, 20_240_101, bytes32(0));
 
         // Second attestation (later date)
         vm.prank(attestor);
-        oracle.attestNAV(1010 * 1e18, 20240102, bytes32(0));
+        oracle.attestNAV(1010 * 1e18, 20_240_102, bytes32(0));
 
         assertEq(oracle.getCurrentNAVPerShare(), 1.01e18);
         assertEq(oracle.getHistoryCount(), 2);
@@ -130,7 +134,7 @@ contract NAVOracleTest is Test {
     function test_RevertAttestZeroAssets() public {
         vm.prank(attestor);
         vm.expectRevert(NAVOracle.InvalidTotalAssets.selector);
-        oracle.attestNAV(0, 20240101, bytes32(0));
+        oracle.attestNAV(0, 20_240_101, bytes32(0));
     }
 
     function test_RevertAttestOldDate() public {
@@ -138,29 +142,29 @@ contract NAVOracleTest is Test {
 
         // First attestation
         vm.prank(attestor);
-        oracle.attestNAV(1000 * 1e18, 20240102, bytes32(0));
+        oracle.attestNAV(1000 * 1e18, 20_240_102, bytes32(0));
 
         // Try to attest with older date
         vm.prank(attestor);
         vm.expectRevert(NAVOracle.ReportDateNotNew.selector);
-        oracle.attestNAV(1010 * 1e18, 20240101, bytes32(0));
+        oracle.attestNAV(1010 * 1e18, 20_240_101, bytes32(0));
     }
 
     function test_RevertAttestSameDate() public {
         mockSsUSD.setTotalShares(1000 * 1e18);
 
         vm.prank(attestor);
-        oracle.attestNAV(1000 * 1e18, 20240101, bytes32(0));
+        oracle.attestNAV(1000 * 1e18, 20_240_101, bytes32(0));
 
         vm.prank(attestor);
         vm.expectRevert(NAVOracle.ReportDateNotNew.selector);
-        oracle.attestNAV(1010 * 1e18, 20240101, bytes32(0));
+        oracle.attestNAV(1010 * 1e18, 20_240_101, bytes32(0));
     }
 
     function test_RevertUnauthorizedAttestor() public {
         vm.prank(unauthorized);
         vm.expectRevert(NAVOracle.NotAuthorizedAttestor.selector);
-        oracle.attestNAV(1000 * 1e18, 20240101, bytes32(0));
+        oracle.attestNAV(1000 * 1e18, 20_240_101, bytes32(0));
     }
 
     // =========================================================================
@@ -172,12 +176,12 @@ contract NAVOracleTest is Test {
 
         // First attestation
         vm.prank(attestor);
-        oracle.attestNAV(1000 * 1e18, 20240101, bytes32(0));
+        oracle.attestNAV(1000 * 1e18, 20_240_101, bytes32(0));
 
         // Try 10% increase (exceeds 5% limit)
         vm.prank(attestor);
         vm.expectRevert(NAVOracle.NAVChangeExceedsLimit.selector);
-        oracle.attestNAV(1100 * 1e18, 20240102, bytes32(0));
+        oracle.attestNAV(1100 * 1e18, 20_240_102, bytes32(0));
     }
 
     function test_RevertNAVDecreaseTooLarge() public {
@@ -185,23 +189,23 @@ contract NAVOracleTest is Test {
 
         // First attestation
         vm.prank(attestor);
-        oracle.attestNAV(1000 * 1e18, 20240101, bytes32(0));
+        oracle.attestNAV(1000 * 1e18, 20_240_101, bytes32(0));
 
         // Try 5% decrease (exceeds 1% allowed decrease)
         vm.prank(attestor);
         vm.expectRevert(NAVOracle.NAVChangeExceedsLimit.selector);
-        oracle.attestNAV(950 * 1e18, 20240102, bytes32(0));
+        oracle.attestNAV(950 * 1e18, 20_240_102, bytes32(0));
     }
 
     function test_AllowSmallNAVDecrease() public {
         mockSsUSD.setTotalShares(1000 * 1e18);
 
         vm.prank(attestor);
-        oracle.attestNAV(1000 * 1e18, 20240101, bytes32(0));
+        oracle.attestNAV(1000 * 1e18, 20_240_101, bytes32(0));
 
         // 0.5% decrease should be allowed
         vm.prank(attestor);
-        oracle.attestNAV(995 * 1e18, 20240102, bytes32(0));
+        oracle.attestNAV(995 * 1e18, 20_240_102, bytes32(0));
 
         assertApproxEqRel(oracle.getCurrentNAVPerShare(), 0.995e18, 0.001e18);
     }
@@ -210,11 +214,11 @@ contract NAVOracleTest is Test {
         mockSsUSD.setTotalShares(1000 * 1e18);
 
         vm.prank(attestor);
-        oracle.attestNAV(1000 * 1e18, 20240101, bytes32(0));
+        oracle.attestNAV(1000 * 1e18, 20_240_101, bytes32(0));
 
         // 5% increase is the limit
         vm.prank(attestor);
-        oracle.attestNAV(1050 * 1e18, 20240102, bytes32(0));
+        oracle.attestNAV(1050 * 1e18, 20_240_102, bytes32(0));
 
         assertEq(oracle.getCurrentNAVPerShare(), 1.05e18);
     }
@@ -244,7 +248,7 @@ contract NAVOracleTest is Test {
 
         // Attest
         vm.prank(attestor);
-        oracle.attestNAV(1000 * 1e18, 20240101, bytes32(0));
+        oracle.attestNAV(1000 * 1e18, 20_240_101, bytes32(0));
 
         // Now fresh
         assertTrue(oracle.isNAVFresh());
@@ -260,7 +264,7 @@ contract NAVOracleTest is Test {
         // Multiple attestations
         for (uint256 i = 1; i <= 5; i++) {
             vm.prank(attestor);
-            oracle.attestNAV(1000 * 1e18 + i * 1e18, 20240100 + i, bytes32(0));
+            oracle.attestNAV(1000 * 1e18 + i * 1e18, 20_240_100 + i, bytes32(0));
         }
 
         assertEq(oracle.getHistoryCount(), 5); // 5 attestations + initial = 5 historical
@@ -274,10 +278,10 @@ contract NAVOracleTest is Test {
 
         // Only 2 attestations
         vm.prank(attestor);
-        oracle.attestNAV(1000 * 1e18, 20240101, bytes32(0));
+        oracle.attestNAV(1000 * 1e18, 20_240_101, bytes32(0));
 
         vm.prank(attestor);
-        oracle.attestNAV(1001 * 1e18, 20240102, bytes32(0));
+        oracle.attestNAV(1001 * 1e18, 20_240_102, bytes32(0));
 
         // Request 10 but only 2 in history (initial + first)
         INAVOracle.NAVReport[] memory history = oracle.getNAVHistory(10);
@@ -297,7 +301,7 @@ contract NAVOracleTest is Test {
         // New attestor can attest
         mockSsUSD.setTotalShares(1000 * 1e18);
         vm.prank(attestor2);
-        oracle.attestNAV(1000 * 1e18, 20240101, bytes32(0));
+        oracle.attestNAV(1000 * 1e18, 20_240_101, bytes32(0));
     }
 
     function test_RevokeAttestor() public {
@@ -309,7 +313,7 @@ contract NAVOracleTest is Test {
         // Revoked attestor cannot attest
         vm.prank(attestor);
         vm.expectRevert(NAVOracle.NotAuthorizedAttestor.selector);
-        oracle.attestNAV(1000 * 1e18, 20240101, bytes32(0));
+        oracle.attestNAV(1000 * 1e18, 20_240_101, bytes32(0));
     }
 
     function test_SetMaxStaleness() public {
@@ -350,7 +354,7 @@ contract NAVOracleTest is Test {
         mockSsUSD.setTotalShares(1000 * 1e18);
 
         vm.prank(attestor);
-        oracle.attestNAV(5000 * 1e18, 20240101, bytes32(0));
+        oracle.attestNAV(5000 * 1e18, 20_240_101, bytes32(0));
 
         assertEq(oracle.getTotalAssets(), 5000 * 1e18);
     }
@@ -359,9 +363,9 @@ contract NAVOracleTest is Test {
         mockSsUSD.setTotalShares(1000 * 1e18);
 
         vm.prank(attestor);
-        oracle.attestNAV(1000 * 1e18, 20240315, bytes32(0));
+        oracle.attestNAV(1000 * 1e18, 20_240_315, bytes32(0));
 
-        assertEq(oracle.getLastReportDate(), 20240315);
+        assertEq(oracle.getLastReportDate(), 20_240_315);
     }
 
     // =========================================================================
@@ -376,7 +380,7 @@ contract NAVOracleTest is Test {
         mockSsUSD.setTotalShares(totalShares);
 
         vm.prank(attestor);
-        oracle.attestNAV(totalAssets, 20240101, bytes32(0));
+        oracle.attestNAV(totalAssets, 20_240_101, bytes32(0));
 
         uint256 expectedNav = (totalAssets * 1e18) / totalShares;
         assertEq(oracle.getCurrentNAVPerShare(), expectedNav);

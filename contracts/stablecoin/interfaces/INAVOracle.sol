@@ -11,13 +11,13 @@ interface INAVOracle {
     // =========================================================================
 
     struct NAVReport {
-        uint256 totalAssets;      // Total T-Bill value in USD (18 decimals)
-        uint256 totalShares;      // Total ssUSD shares outstanding
-        uint256 navPerShare;      // NAV per share (1e18 = $1.00)
-        uint256 timestamp;        // Block timestamp of attestation
-        uint256 reportDate;       // Date of T-Bill valuation (YYYYMMDD)
-        bytes32 proofHash;        // Hash of off-chain proof documents
-        address attestor;         // Address that submitted attestation
+        uint256 totalAssets; // Total T-Bill value in USD (18 decimals)
+        uint256 totalShares; // Total ssUSD shares outstanding
+        uint256 navPerShare; // NAV per share (1e18 = $1.00)
+        uint256 timestamp; // Block timestamp of attestation
+        uint256 reportDate; // Date of T-Bill valuation (YYYYMMDD)
+        bytes32 proofHash; // Hash of off-chain proof documents
+        address attestor; // Address that submitted attestation
     }
 
     // =========================================================================
@@ -25,10 +25,7 @@ interface INAVOracle {
     // =========================================================================
 
     event NAVAttested(
-        uint256 totalAssets,
-        uint256 navPerShare,
-        uint256 reportDate,
-        address indexed attestor
+        uint256 totalAssets, uint256 navPerShare, uint256 reportDate, address indexed attestor
     );
 
     event AttestorUpdated(address indexed attestor, bool authorized);
@@ -43,11 +40,7 @@ interface INAVOracle {
     // Functions
     // =========================================================================
 
-    function attestNAV(
-        uint256 totalAssets,
-        uint256 reportDate,
-        bytes32 proofHash
-    ) external;
+    function attestNAV(uint256 totalAssets, uint256 reportDate, bytes32 proofHash) external;
 
     function getCurrentNAVPerShare() external view returns (uint256);
 

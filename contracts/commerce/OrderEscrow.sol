@@ -30,7 +30,14 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 contract OrderEscrow is ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    enum Status { None, Locked, Delivered, Disputed, Released, Refunded }
+    enum Status {
+        None,
+        Locked,
+        Delivered,
+        Disputed,
+        Released,
+        Refunded
+    }
 
     struct Order {
         address buyer;
@@ -39,12 +46,12 @@ contract OrderEscrow is ReentrancyGuard {
         uint128 amount;
         uint64 lockedAt;
         uint64 deliveredAt;
-        uint64 deliveryDeadline;     // after this, buyer can refund unless delivered
-        uint64 confirmationWindow;   // seconds buyer has to dispute after delivery
+        uint64 deliveryDeadline; // after this, buyer can refund unless delivered
+        uint64 confirmationWindow; // seconds buyer has to dispute after delivery
         bytes32 deliveryReceiptHash; // hash of the off-chain delivery receipt
         Status status;
-        address feeRecipient;        // marketplace / platform; address(0) = no fee
-        uint16 feeBps;               // basis points (1 bps = 0.01%); ≤ MAX_FEE_BPS
+        address feeRecipient; // marketplace / platform; address(0) = no fee
+        uint16 feeBps; // basis points (1 bps = 0.01%); ≤ MAX_FEE_BPS
     }
 
     /// @notice Maximum platform fee = 10% (1000 bps). Hard-capped to keep the
@@ -105,8 +112,7 @@ contract OrderEscrow is ReentrancyGuard {
         uint64 deliveryDeadline,
         uint64 confirmationWindow
     ) external nonReentrant {
-        _lock(orderId, seller, token, amount, deliveryDeadline, confirmationWindow,
-              address(0), 0);
+        _lock(orderId, seller, token, amount, deliveryDeadline, confirmationWindow, address(0), 0);
     }
 
     /// @notice Lock with a marketplace / platform fee. The fee is taken on
@@ -125,8 +131,16 @@ contract OrderEscrow is ReentrancyGuard {
     ) external nonReentrant {
         if (feeBps > MAX_FEE_BPS) revert FeeTooHigh(feeBps, MAX_FEE_BPS);
         require(feeRecipient != address(0) || feeBps == 0, "fee=0 needs no recipient");
-        _lock(orderId, seller, token, amount, deliveryDeadline, confirmationWindow,
-              feeRecipient, feeBps);
+        _lock(
+            orderId,
+            seller,
+            token,
+            amount,
+            deliveryDeadline,
+            confirmationWindow,
+            feeRecipient,
+            feeBps
+        );
     }
 
     function _lock(
@@ -171,7 +185,7 @@ contract OrderEscrow is ReentrancyGuard {
         returns (uint256 toSeller)
     {
         if (o.feeBps != 0 && o.feeRecipient != address(0)) {
-            uint256 fee = (total * o.feeBps) / 10000;
+            uint256 fee = (total * o.feeBps) / 10_000;
             if (fee > 0) {
                 o.token.safeTransfer(o.feeRecipient, fee);
                 emit FeeTaken(orderId, o.feeRecipient, fee);
@@ -229,10 +243,7 @@ contract OrderEscrow is ReentrancyGuard {
     }
 
     /// @notice Operator resolves a dispute. Routes funds to the winning side.
-    function resolveDispute(bytes32 orderId, bool inFavorOfSeller)
-        external
-        nonReentrant
-    {
+    function resolveDispute(bytes32 orderId, bool inFavorOfSeller) external nonReentrant {
         Order storage o = orders[orderId];
         if (o.status != Status.Disputed) revert OrderNotDisputed();
         if (msg.sender != operator) revert NotAuthorized();

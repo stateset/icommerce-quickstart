@@ -33,9 +33,9 @@ contract SetPaymaster is
     /// @dev Packed: name(string=2 slots) + limits(16+16=1 slot) + month+active(16+1=1 slot)
     struct SponsorshipTier {
         string name;
-        uint128 maxPerTransaction;  // Max gas sponsorship per tx (wei), max ~3.4e38
-        uint128 maxPerDay;          // Max gas sponsorship per day (wei)
-        uint128 maxPerMonth;        // Max gas sponsorship per month (wei)
+        uint128 maxPerTransaction; // Max gas sponsorship per tx (wei), max ~3.4e38
+        uint128 maxPerDay; // Max gas sponsorship per day (wei)
+        uint128 maxPerMonth; // Max gas sponsorship per month (wei)
         bool active;
     }
 
@@ -165,10 +165,7 @@ contract SetPaymaster is
      * @param _owner Owner address
      * @param _treasury Treasury address for deposits
      */
-    function initialize(
-        address _owner,
-        address _treasury
-    ) public initializer {
+    function initialize(address _owner, address _treasury) public initializer {
         if (_owner == address(0) || _treasury == address(0)) {
             revert InvalidAddress();
         }
@@ -305,10 +302,7 @@ contract SetPaymaster is
      * @param _merchant Merchant address
      * @param _tierId Sponsorship tier ID
      */
-    function sponsorMerchant(
-        address _merchant,
-        uint256 _tierId
-    ) external onlyOwner {
+    function sponsorMerchant(address _merchant, uint256 _tierId) external onlyOwner {
         if (_merchant == address(0)) {
             revert InvalidAddress();
         }
@@ -348,10 +342,11 @@ contract SetPaymaster is
      * @return sponsorable Whether sponsorship is possible
      * @return reason Reason if cannot sponsor
      */
-    function canSponsor(
-        address _merchant,
-        uint256 _amount
-    ) external view returns (bool sponsorable, string memory reason) {
+    function canSponsor(address _merchant, uint256 _amount)
+        external
+        view
+        returns (bool sponsorable, string memory reason)
+    {
         return _canSponsor(_merchant, _amount);
     }
 
@@ -365,11 +360,11 @@ contract SetPaymaster is
      * @param _amount Gas amount to sponsor
      * @param _operationType Type of commerce operation
      */
-    function executeSponsorship(
-        address _merchant,
-        uint256 _amount,
-        OperationType _operationType
-    ) external onlyOperator nonReentrant {
+    function executeSponsorship(address _merchant, uint256 _amount, OperationType _operationType)
+        external
+        onlyOperator
+        nonReentrant
+    {
         MerchantSponsorship storage sponsorship = merchantSponsorship[_merchant];
 
         if (!sponsorship.active) {
@@ -412,7 +407,7 @@ contract SetPaymaster is
         }
 
         // Transfer gas to merchant
-        (bool success, ) = _merchant.call{value: _amount}("");
+        (bool success,) = _merchant.call{ value: _amount }("");
         if (!success) revert TransferFailed();
 
         emit GasSponsored(_merchant, _amount, _operationType);
@@ -423,10 +418,12 @@ contract SetPaymaster is
      * @param _merchant Merchant address
      * @param _refundAmount Amount to refund
      */
-    function refundUnusedGas(
-        address _merchant,
-        uint256 _refundAmount
-    ) external payable onlyOperator nonReentrant {
+    function refundUnusedGas(address _merchant, uint256 _refundAmount)
+        external
+        payable
+        onlyOperator
+        nonReentrant
+    {
         if (_merchant == address(0)) revert InvalidAddress();
         if (msg.value != _refundAmount) {
             revert RefundValueMismatch(_refundAmount, msg.value);
@@ -454,7 +451,7 @@ contract SetPaymaster is
     function withdraw(uint256 _amount) external onlyOwner {
         if (address(this).balance < _amount) revert InsufficientBalance();
 
-        (bool success, ) = treasury.call{value: _amount}("");
+        (bool success,) = treasury.call{ value: _amount }("");
         if (!success) revert WithdrawFailed();
 
         emit Withdrawn(treasury, _amount);
@@ -475,9 +472,7 @@ contract SetPaymaster is
      * @notice Get merchant's remaining daily allowance
      * @param _merchant Merchant address
      */
-    function getRemainingDailyAllowance(
-        address _merchant
-    ) external view returns (uint256) {
+    function getRemainingDailyAllowance(address _merchant) external view returns (uint256) {
         return _getRemainingDailyAllowance(_merchant);
     }
 
@@ -485,15 +480,17 @@ contract SetPaymaster is
      * @notice Get merchant's sponsorship details
      * @param _merchant Merchant address
      */
-    function getMerchantDetails(
-        address _merchant
-    ) external view returns (
-        bool active,
-        uint256 tierId,
-        uint256 spentToday,
-        uint256 spentThisMonth,
-        uint256 totalSponsored
-    ) {
+    function getMerchantDetails(address _merchant)
+        external
+        view
+        returns (
+            bool active,
+            uint256 tierId,
+            uint256 spentToday,
+            uint256 spentThisMonth,
+            uint256 totalSponsored
+        )
+    {
         return _getMerchantDetails(_merchant);
     }
 
@@ -552,28 +549,25 @@ contract SetPaymaster is
         }
     }
 
-    function _getTodaySpent(
-        MerchantSponsorship storage s
-    ) internal view returns (uint256) {
+    function _getTodaySpent(MerchantSponsorship storage s) internal view returns (uint256) {
         if (block.timestamp - s.lastDayReset >= 1 days) {
             return 0;
         }
         return s.spentToday;
     }
 
-    function _getMonthSpent(
-        MerchantSponsorship storage s
-    ) internal view returns (uint256) {
+    function _getMonthSpent(MerchantSponsorship storage s) internal view returns (uint256) {
         if (block.timestamp - s.lastMonthReset >= 30 days) {
             return 0;
         }
         return s.spentThisMonth;
     }
 
-    function _canSponsor(
-        address _merchant,
-        uint256 _amount
-    ) internal view returns (bool, string memory) {
+    function _canSponsor(address _merchant, uint256 _amount)
+        internal
+        view
+        returns (bool, string memory)
+    {
         MerchantSponsorship storage sponsorship = merchantSponsorship[_merchant];
 
         if (!sponsorship.active) {
@@ -607,9 +601,7 @@ contract SetPaymaster is
         return (true, "");
     }
 
-    function _getRemainingDailyAllowance(
-        address _merchant
-    ) internal view returns (uint256) {
+    function _getRemainingDailyAllowance(address _merchant) internal view returns (uint256) {
         MerchantSponsorship storage sponsorship = merchantSponsorship[_merchant];
 
         if (!sponsorship.active) {
@@ -626,23 +618,19 @@ contract SetPaymaster is
         return tier.maxPerDay - spent;
     }
 
-    function _getMerchantDetails(
-        address _merchant
-    ) internal view returns (
-        bool active,
-        uint256 tierId,
-        uint256 spentToday,
-        uint256 spentThisMonth,
-        uint256 totalSponsored
-    ) {
+    function _getMerchantDetails(address _merchant)
+        internal
+        view
+        returns (
+            bool active,
+            uint256 tierId,
+            uint256 spentToday,
+            uint256 spentThisMonth,
+            uint256 totalSponsored
+        )
+    {
         MerchantSponsorship storage s = merchantSponsorship[_merchant];
-        return (
-            s.active,
-            s.tierId,
-            _getTodaySpent(s),
-            _getMonthSpent(s),
-            s.totalSponsored
-        );
+        return (s.active, s.tierId, _getTodaySpent(s), _getMonthSpent(s), s.totalSponsored);
     }
 
     function _applyRefund(address _merchant, uint256 _refundAmount) internal {
@@ -657,12 +645,10 @@ contract SetPaymaster is
         }
 
         uint128 refund128 = uint128(_refundAmount);
-        uint128 dailyRefund = refund128 > sponsorship.spentToday
-            ? sponsorship.spentToday
-            : refund128;
-        uint128 monthlyRefund = refund128 > sponsorship.spentThisMonth
-            ? sponsorship.spentThisMonth
-            : refund128;
+        uint128 dailyRefund =
+            refund128 > sponsorship.spentToday ? sponsorship.spentToday : refund128;
+        uint128 monthlyRefund =
+            refund128 > sponsorship.spentThisMonth ? sponsorship.spentThisMonth : refund128;
 
         sponsorship.spentToday -= dailyRefund;
         sponsorship.spentThisMonth -= monthlyRefund;
@@ -671,9 +657,7 @@ contract SetPaymaster is
         emit GasRefunded(_merchant, _refundAmount);
     }
 
-    function _authorizeUpgrade(
-        address newImplementation
-    ) internal override onlyOwner {
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
         emit ContractUpgraded(newImplementation, msg.sender);
     }
 
@@ -686,10 +670,10 @@ contract SetPaymaster is
      * @param _merchants Array of merchant addresses
      * @param _tierIds Array of tier IDs for each merchant
      */
-    function batchSponsorMerchants(
-        address[] calldata _merchants,
-        uint256[] calldata _tierIds
-    ) external onlyOwner {
+    function batchSponsorMerchants(address[] calldata _merchants, uint256[] calldata _tierIds)
+        external
+        onlyOwner
+    {
         if (_merchants.length == 0) revert EmptyArray();
         if (_merchants.length != _tierIds.length) revert ArrayLengthMismatch();
         if (_merchants.length > MAX_BATCH_SIZE) revert BatchTooLarge();
@@ -808,7 +792,7 @@ contract SetPaymaster is
             sponsorship.totalSponsored += amt;
 
             // Transfer gas to merchant
-            (bool success, ) = _merchants[i].call{value: _amounts[i]}("");
+            (bool success,) = _merchants[i].call{ value: _amounts[i] }("");
             if (success) {
                 emit GasSponsored(_merchants[i], _amounts[i], _operationTypes[i]);
                 succeeded++;
@@ -831,10 +815,12 @@ contract SetPaymaster is
      * @param _merchants Array of merchant addresses
      * @param _refundAmounts Array of refund amounts
      */
-    function batchRefundUnusedGas(
-        address[] calldata _merchants,
-        uint256[] calldata _refundAmounts
-    ) external payable onlyOperator nonReentrant {
+    function batchRefundUnusedGas(address[] calldata _merchants, uint256[] calldata _refundAmounts)
+        external
+        payable
+        onlyOperator
+        nonReentrant
+    {
         if (_merchants.length == 0) revert EmptyArray();
         if (_merchants.length != _refundAmounts.length) revert ArrayLengthMismatch();
         if (_merchants.length > MAX_BATCH_SIZE) revert BatchTooLarge();
@@ -860,9 +846,11 @@ contract SetPaymaster is
      * @return statuses Array of active status for each merchant
      * @return tiers_ Array of tier IDs for each merchant
      */
-    function batchGetMerchantStatus(
-        address[] calldata _merchants
-    ) external view returns (bool[] memory statuses, uint256[] memory tiers_) {
+    function batchGetMerchantStatus(address[] calldata _merchants)
+        external
+        view
+        returns (bool[] memory statuses, uint256[] memory tiers_)
+    {
         statuses = new bool[](_merchants.length);
         tiers_ = new uint256[](_merchants.length);
 
@@ -882,10 +870,11 @@ contract SetPaymaster is
      * @return canSponsor_ Array of booleans indicating sponsorability
      * @return reasons Array of rejection reasons (empty if sponsorable)
      */
-    function batchCanSponsor(
-        address[] calldata _merchants,
-        uint256[] calldata _amounts
-    ) external view returns (bool[] memory canSponsor_, string[] memory reasons) {
+    function batchCanSponsor(address[] calldata _merchants, uint256[] calldata _amounts)
+        external
+        view
+        returns (bool[] memory canSponsor_, string[] memory reasons)
+    {
         if (_merchants.length != _amounts.length) revert ArrayLengthMismatch();
 
         canSponsor_ = new bool[](_merchants.length);
@@ -903,9 +892,11 @@ contract SetPaymaster is
      * @param _merchants Array of merchant addresses
      * @return allowances Array of remaining daily allowances
      */
-    function batchGetRemainingDailyAllowance(
-        address[] calldata _merchants
-    ) external view returns (uint256[] memory allowances) {
+    function batchGetRemainingDailyAllowance(address[] calldata _merchants)
+        external
+        view
+        returns (uint256[] memory allowances)
+    {
         allowances = new uint256[](_merchants.length);
 
         for (uint256 i = 0; i < _merchants.length; i++) {
@@ -924,15 +915,17 @@ contract SetPaymaster is
      * @return spentThisMonth Monthly spend per merchant
      * @return totalSponsored Total sponsored per merchant
      */
-    function batchGetMerchantDetails(
-        address[] calldata _merchants
-    ) external view returns (
-        bool[] memory active,
-        uint256[] memory tierIds,
-        uint256[] memory spentToday,
-        uint256[] memory spentThisMonth,
-        uint256[] memory totalSponsored
-    ) {
+    function batchGetMerchantDetails(address[] calldata _merchants)
+        external
+        view
+        returns (
+            bool[] memory active,
+            uint256[] memory tierIds,
+            uint256[] memory spentToday,
+            uint256[] memory spentThisMonth,
+            uint256[] memory totalSponsored
+        )
+    {
         active = new bool[](_merchants.length);
         tierIds = new uint256[](_merchants.length);
         spentToday = new uint256[](_merchants.length);
@@ -940,13 +933,8 @@ contract SetPaymaster is
         totalSponsored = new uint256[](_merchants.length);
 
         for (uint256 i = 0; i < _merchants.length; i++) {
-            (
-                active[i],
-                tierIds[i],
-                spentToday[i],
-                spentThisMonth[i],
-                totalSponsored[i]
-            ) = _getMerchantDetails(_merchants[i]);
+            (active[i], tierIds[i], spentToday[i], spentThisMonth[i], totalSponsored[i]) =
+                _getMerchantDetails(_merchants[i]);
         }
 
         return (active, tierIds, spentToday, spentThisMonth, totalSponsored);
@@ -957,10 +945,10 @@ contract SetPaymaster is
      * @param _merchants Array of merchant addresses
      * @param _newTierId New tier ID to assign
      */
-    function batchUpdateMerchantTier(
-        address[] calldata _merchants,
-        uint256 _newTierId
-    ) external onlyOwner {
+    function batchUpdateMerchantTier(address[] calldata _merchants, uint256 _newTierId)
+        external
+        onlyOwner
+    {
         if (_merchants.length == 0) revert EmptyArray();
         if (_merchants.length > MAX_BATCH_SIZE) revert BatchTooLarge();
         if (_newTierId >= nextTierId || !tiers[_newTierId].active) revert InvalidTier();
@@ -986,12 +974,16 @@ contract SetPaymaster is
      * @return tierCount Number of tiers
      * @return treasuryAddr Treasury address
      */
-    function getPaymasterStatus() external view returns (
-        uint256 paymasterBalance,
-        uint256 totalSponsored_,
-        uint256 tierCount,
-        address treasuryAddr
-    ) {
+    function getPaymasterStatus()
+        external
+        view
+        returns (
+            uint256 paymasterBalance,
+            uint256 totalSponsored_,
+            uint256 tierCount,
+            address treasuryAddr
+        )
+    {
         return (
             address(this).balance,
             0, // totalGasSponsored removed (derivable from events)
@@ -1008,13 +1000,17 @@ contract SetPaymaster is
      * @return maxPerDay_ Array of max per day limits
      * @return maxPerMonth_ Array of max per month limits
      */
-    function getAllTiers() external view returns (
-        uint256[] memory tierIds,
-        string[] memory names,
-        uint256[] memory maxPerTx,
-        uint256[] memory maxPerDay_,
-        uint256[] memory maxPerMonth_
-    ) {
+    function getAllTiers()
+        external
+        view
+        returns (
+            uint256[] memory tierIds,
+            string[] memory names,
+            uint256[] memory maxPerTx,
+            uint256[] memory maxPerDay_,
+            uint256[] memory maxPerMonth_
+        )
+    {
         // Count active tiers
         uint256 activeCount = 0;
         for (uint256 i = 0; i < nextTierId; i++) {

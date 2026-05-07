@@ -21,8 +21,10 @@ jobs:
           forge install foundry-rs/forge-std
           forge install OpenZeppelin/openzeppelin-contracts@v5.0.0
           forge install OpenZeppelin/openzeppelin-contracts-upgradeable@v5.0.0
+      - name: forge fmt (check)
+        run: forge fmt --check
       - name: forge build
-        run: forge build --skip test
+        run: forge build --skip test --sizes
       - name: forge test
         run: forge test -vvv --no-match-path 'lib/**'
 

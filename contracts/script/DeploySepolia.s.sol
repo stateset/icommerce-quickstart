@@ -70,21 +70,21 @@ contract DeploySepolia is Script {
         // ── SetRegistry (UUPS) ────────────────────────────────────────────
         SetRegistry registryImpl = new SetRegistry();
         bytes memory regInit = abi.encodeCall(SetRegistry.initialize, (owner, sequencer));
-        SetRegistry registry = SetRegistry(address(new ERC1967Proxy(address(registryImpl), regInit)));
+        SetRegistry registry =
+            SetRegistry(address(new ERC1967Proxy(address(registryImpl), regInit)));
         console.log("SetRegistry  ", address(registry));
 
         // ── SetPaymaster (UUPS) ───────────────────────────────────────────
         SetPaymaster paymasterImpl = new SetPaymaster();
         bytes memory paymasterInit = abi.encodeCall(SetPaymaster.initialize, (owner, treasury));
-        SetPaymaster paymaster = SetPaymaster(payable(address(new ERC1967Proxy(address(paymasterImpl), paymasterInit))));
+        SetPaymaster paymaster =
+            SetPaymaster(payable(address(new ERC1967Proxy(address(paymasterImpl), paymasterInit))));
         console.log("SetPaymaster ", address(paymaster));
 
         // ── NAVOracle (UUPS) ──────────────────────────────────────────────
         NAVOracle navImpl = new NAVOracle();
-        bytes memory navInit = abi.encodeCall(
-            NAVOracle.initialize,
-            (owner, navAttestor, uint256(7 days))
-        );
+        bytes memory navInit =
+            abi.encodeCall(NAVOracle.initialize, (owner, navAttestor, uint256(7 days)));
         NAVOracle nav = NAVOracle(address(new ERC1967Proxy(address(navImpl), navInit)));
         console.log("NAVOracle    ", address(nav));
 
@@ -113,12 +113,10 @@ contract DeploySepolia is Script {
         // ── SetPaymentBatch (UUPS) ───────────────────────────────────────
         SetPaymentBatch paymentImpl = new SetPaymentBatch();
         bytes memory paymentInit = abi.encodeCall(
-            SetPaymentBatch.initialize,
-            (owner, sequencer, usdc, address(ssdc), address(registry))
+            SetPaymentBatch.initialize, (owner, sequencer, usdc, address(ssdc), address(registry))
         );
-        SetPaymentBatch paymentBatch = SetPaymentBatch(
-            address(new ERC1967Proxy(address(paymentImpl), paymentInit))
-        );
+        SetPaymentBatch paymentBatch =
+            SetPaymentBatch(address(new ERC1967Proxy(address(paymentImpl), paymentInit)));
         console.log("PaymentBatch ", address(paymentBatch));
 
         // ── OrderEscrow (plain) ──────────────────────────────────────────

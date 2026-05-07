@@ -20,13 +20,7 @@ import "./interfaces/INAVOracle.sol";
  *
  * This design allows yield distribution without gas costs per holder.
  */
-contract SSDC is
-    ISSDC,
-    Initializable,
-    OwnableUpgradeable,
-    PausableUpgradeable,
-    UUPSUpgradeable
-{
+contract SSDC is ISSDC, Initializable, OwnableUpgradeable, PausableUpgradeable, UUPSUpgradeable {
     // =========================================================================
     // Constants
     // =========================================================================
@@ -99,7 +93,7 @@ contract SSDC is
         uint256 previousSupply,
         uint256 newSupply,
         int256 delta,
-        string indexed changeType  // "mint" or "burn"
+        string indexed changeType // "mint" or "burn"
     );
 
     /// @notice Emitted when contract is upgraded
@@ -148,10 +142,7 @@ contract SSDC is
      * @param owner_ Owner address
      * @param navOracle_ NAV oracle address
      */
-    function initialize(
-        address owner_,
-        address navOracle_
-    ) public initializer {
+    function initialize(address owner_, address navOracle_) public initializer {
         __Ownable_init(owner_);
         __Pausable_init();
         __UUPSUpgradeable_init();
@@ -213,10 +204,7 @@ contract SSDC is
     /**
      * @notice Get allowance
      */
-    function allowance(
-        address owner_,
-        address spender
-    ) external view returns (uint256) {
+    function allowance(address owner_, address spender) external view returns (uint256) {
         return _allowances[owner_][spender];
     }
 
@@ -263,11 +251,7 @@ contract SSDC is
     /**
      * @notice Transfer from another account
      */
-    function transferFrom(
-        address from,
-        address to,
-        uint256 amount
-    ) external returns (bool) {
+    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
         _spendAllowance(from, msg.sender, amount);
         _transfer(from, to, amount);
         return true;
@@ -316,11 +300,7 @@ contract SSDC is
     /**
      * @notice Transfer shares from another account
      */
-    function transferSharesFrom(
-        address from,
-        address to,
-        uint256 shares
-    ) external returns (bool) {
+    function transferSharesFrom(address from, address to, uint256 shares) external returns (bool) {
         uint256 amount = _sharesToAmount(shares);
         _spendAllowance(from, msg.sender, amount);
         _transferShares(from, to, shares);
@@ -586,11 +566,7 @@ contract SSDC is
     /**
      * @dev Spend allowance
      */
-    function _spendAllowance(
-        address owner_,
-        address spender,
-        uint256 amount
-    ) internal {
+    function _spendAllowance(address owner_, address spender, uint256 amount) internal {
         uint256 currentAllowance = _allowances[owner_][spender];
         if (currentAllowance != type(uint256).max) {
             if (currentAllowance < amount) revert InsufficientAllowance();
@@ -605,9 +581,7 @@ contract SSDC is
     /**
      * @dev Authorize upgrade (owner only)
      */
-    function _authorizeUpgrade(
-        address newImplementation
-    ) internal override onlyOwner {
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
         emit ContractUpgraded(newImplementation, msg.sender);
     }
 
@@ -621,10 +595,10 @@ contract SSDC is
      * @param amounts Array of amounts to transfer
      * @return success True if all transfers succeeded
      */
-    function batchTransfer(
-        address[] calldata recipients,
-        uint256[] calldata amounts
-    ) external returns (bool success) {
+    function batchTransfer(address[] calldata recipients, uint256[] calldata amounts)
+        external
+        returns (bool success)
+    {
         if (recipients.length == 0) revert EmptyArray();
         if (recipients.length != amounts.length) revert ArrayLengthMismatch();
 
@@ -641,10 +615,10 @@ contract SSDC is
      * @param sharesAmounts Array of shares to transfer
      * @return success True if all transfers succeeded
      */
-    function batchTransferShares(
-        address[] calldata recipients,
-        uint256[] calldata sharesAmounts
-    ) external returns (bool success) {
+    function batchTransferShares(address[] calldata recipients, uint256[] calldata sharesAmounts)
+        external
+        returns (bool success)
+    {
         if (recipients.length == 0) revert EmptyArray();
         if (recipients.length != sharesAmounts.length) revert ArrayLengthMismatch();
 
@@ -668,14 +642,18 @@ contract SSDC is
      * @return treasuryVault_ Treasury vault address
      * @return navOracle_ NAV oracle address
      */
-    function getTokenStatus() external view returns (
-        uint256 totalSupply_,
-        uint256 totalShares_,
-        uint256 navPerShare_,
-        bool isPaused_,
-        address treasuryVault_,
-        address navOracle_
-    ) {
+    function getTokenStatus()
+        external
+        view
+        returns (
+            uint256 totalSupply_,
+            uint256 totalShares_,
+            uint256 navPerShare_,
+            bool isPaused_,
+            address treasuryVault_,
+            address navOracle_
+        )
+    {
         navPerShare_ = _getNavPerShareView();
         return (
             _sharesToAmountView(_totalShares),
@@ -694,16 +672,16 @@ contract SSDC is
      * @return shares Account's shares
      * @return percentOfSupply Percentage of total supply (basis points)
      */
-    function getAccountDetails(address account) external view returns (
-        uint256 balance,
-        uint256 shares,
-        uint256 percentOfSupply
-    ) {
+    function getAccountDetails(address account)
+        external
+        view
+        returns (uint256 balance, uint256 shares, uint256 percentOfSupply)
+    {
         shares = _shares[account];
         balance = _sharesToAmountView(shares);
 
         if (_totalShares > 0) {
-            percentOfSupply = (shares * 10000) / _totalShares;
+            percentOfSupply = (shares * 10_000) / _totalShares;
         } else {
             percentOfSupply = 0;
         }
@@ -716,9 +694,11 @@ contract SSDC is
      * @param accounts Array of account addresses
      * @return balances Array of rebased balances
      */
-    function batchBalanceOf(
-        address[] calldata accounts
-    ) external view returns (uint256[] memory balances) {
+    function batchBalanceOf(address[] calldata accounts)
+        external
+        view
+        returns (uint256[] memory balances)
+    {
         balances = new uint256[](accounts.length);
         for (uint256 i = 0; i < accounts.length; i++) {
             balances[i] = _sharesToAmountView(_shares[accounts[i]]);
@@ -731,9 +711,11 @@ contract SSDC is
      * @param accounts Array of account addresses
      * @return shares Array of shares
      */
-    function batchSharesOf(
-        address[] calldata accounts
-    ) external view returns (uint256[] memory shares) {
+    function batchSharesOf(address[] calldata accounts)
+        external
+        view
+        returns (uint256[] memory shares)
+    {
         shares = new uint256[](accounts.length);
         for (uint256 i = 0; i < accounts.length; i++) {
             shares[i] = _shares[accounts[i]];
@@ -746,9 +728,11 @@ contract SSDC is
      * @param amounts Array of amounts
      * @return shares Array of equivalent shares
      */
-    function batchGetSharesByAmount(
-        uint256[] calldata amounts
-    ) external view returns (uint256[] memory shares) {
+    function batchGetSharesByAmount(uint256[] calldata amounts)
+        external
+        view
+        returns (uint256[] memory shares)
+    {
         shares = new uint256[](amounts.length);
         for (uint256 i = 0; i < amounts.length; i++) {
             shares[i] = _amountToSharesView(amounts[i]);
@@ -761,9 +745,11 @@ contract SSDC is
      * @param sharesArray Array of shares
      * @return amounts Array of equivalent amounts
      */
-    function batchGetAmountByShares(
-        uint256[] calldata sharesArray
-    ) external view returns (uint256[] memory amounts) {
+    function batchGetAmountByShares(uint256[] calldata sharesArray)
+        external
+        view
+        returns (uint256[] memory amounts)
+    {
         amounts = new uint256[](sharesArray.length);
         for (uint256 i = 0; i < sharesArray.length; i++) {
             amounts[i] = _sharesToAmountView(sharesArray[i]);
@@ -777,10 +763,11 @@ contract SSDC is
      * @param newNavPerShare Hypothetical NAV per share
      * @return expectedBalance Expected balance at new NAV
      */
-    function simulateBalanceAtNAV(
-        address account,
-        uint256 newNavPerShare
-    ) external view returns (uint256 expectedBalance) {
+    function simulateBalanceAtNAV(address account, uint256 newNavPerShare)
+        external
+        view
+        returns (uint256 expectedBalance)
+    {
         uint256 shares = _shares[account];
         return (shares * newNavPerShare) / PRECISION;
     }
@@ -792,10 +779,11 @@ contract SSDC is
      * @return yieldAccrued Amount of yield earned
      * @return yieldPercent Yield percentage (basis points)
      */
-    function getAccruedYield(
-        address account,
-        uint256 baselineNAV
-    ) external view returns (uint256 yieldAccrued, uint256 yieldPercent) {
+    function getAccruedYield(address account, uint256 baselineNAV)
+        external
+        view
+        returns (uint256 yieldAccrued, uint256 yieldPercent)
+    {
         uint256 shares = _shares[account];
         uint256 currentNAV = _getNavPerShareView();
 
@@ -805,7 +793,7 @@ contract SSDC is
         if (currentValue > baselineValue) {
             yieldAccrued = currentValue - baselineValue;
             if (baselineValue > 0) {
-                yieldPercent = (yieldAccrued * 10000) / baselineValue;
+                yieldPercent = (yieldAccrued * 10_000) / baselineValue;
             }
         }
 

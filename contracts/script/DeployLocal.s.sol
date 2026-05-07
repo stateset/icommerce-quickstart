@@ -34,19 +34,13 @@ contract DeployLocal is Script {
         );
         address deployer = vm.addr(deployerKey);
 
-        address sequencer = vm.envOr(
-            "SEQUENCER_ADDRESS",
-            address(0x70997970C51812dc3A010C7d01b50e0d17dc79C8)
-        );
+        address sequencer =
+            vm.envOr("SEQUENCER_ADDRESS", address(0x70997970C51812dc3A010C7d01b50e0d17dc79C8));
         address registryEnv = vm.envOr("SET_REGISTRY_ADDRESS", address(0));
-        address buyer = vm.envOr(
-            "BUYER_ADDRESS",
-            address(0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC)
-        );
-        address seller = vm.envOr(
-            "SELLER_ADDRESS",
-            address(0x90F79bf6EB2c4f870365E785982E1f101E93b906)
-        );
+        address buyer =
+            vm.envOr("BUYER_ADDRESS", address(0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC));
+        address seller =
+            vm.envOr("SELLER_ADDRESS", address(0x90F79bf6EB2c4f870365E785982E1f101E93b906));
         uint256 mintAmount = vm.envOr("MINT_AMOUNT", uint256(100_000_000_000));
 
         console.log("=== Agent Receipt deploy ===");
@@ -64,10 +58,7 @@ contract DeployLocal is Script {
             console.log("Registry  ", registry, "(reused)");
         } else {
             SetRegistry regImpl = new SetRegistry();
-            bytes memory regInit = abi.encodeCall(
-                SetRegistry.initialize,
-                (deployer, sequencer)
-            );
+            bytes memory regInit = abi.encodeCall(SetRegistry.initialize, (deployer, sequencer));
             registry = address(new ERC1967Proxy(address(regImpl), regInit));
             console.log("Registry  ", registry, "(fresh deploy)");
         }
@@ -77,12 +68,9 @@ contract DeployLocal is Script {
 
         SetPaymentBatch impl = new SetPaymentBatch();
         bytes memory init = abi.encodeCall(
-            SetPaymentBatch.initialize,
-            (deployer, sequencer, address(0), address(ssUSD), registry)
+            SetPaymentBatch.initialize, (deployer, sequencer, address(0), address(ssUSD), registry)
         );
-        SetPaymentBatch payments = SetPaymentBatch(
-            address(new ERC1967Proxy(address(impl), init))
-        );
+        SetPaymentBatch payments = SetPaymentBatch(address(new ERC1967Proxy(address(impl), init)));
         console.log("PaymentBatch", address(payments));
 
         ssUSD.mint(buyer, mintAmount);
@@ -100,7 +88,7 @@ contract DeployLocal is Script {
         NAVOracle navImpl = new NAVOracle();
         bytes memory navInit = abi.encodeCall(
             NAVOracle.initialize,
-            (deployer, deployer, uint256(7 days))   // owner=deployer, attestor=deployer
+            (deployer, deployer, uint256(7 days)) // owner=deployer, attestor=deployer
         );
         NAVOracle nav = NAVOracle(address(new ERC1967Proxy(address(navImpl), navInit)));
         console.log("NAVOracle ", address(nav));
@@ -116,16 +104,16 @@ contract DeployLocal is Script {
 
         // Mint SSDC shares to buyer/seller. Default NAV is $1.00, so 1 share = 1 SSDC.
         // SSDC has 18 decimals (vs MockSsUSD's 6).
-        ssdc.mintShares(buyer, 100_000e18);  // 100,000 SSDC
-        ssdc.mintShares(seller, 10_000e18);  // 10,000 SSDC
+        ssdc.mintShares(buyer, 100_000e18); // 100,000 SSDC
+        ssdc.mintShares(seller, 10_000e18); // 10,000 SSDC
 
         // Approve SSDC as a settlement asset on SetPaymentBatch (alongside ssUSD).
         payments.configureAsset(
             address(ssdc),
             true,
-            1e16,             // min: 0.01 SSDC
-            1e30,             // max: 1e12 SSDC
-            1e32              // daily: 1e14 SSDC
+            1e16, // min: 0.01 SSDC
+            1e30, // max: 1e12 SSDC
+            1e32 // daily: 1e14 SSDC
         );
 
         vm.stopBroadcast();
@@ -139,9 +127,9 @@ contract DeployLocal is Script {
         // Quotes are scaled 1e18; 1-hour TTL is plenty for a demo run.
         // Realistic mid-rates (May 2026 vibe; replace with a feed in prod).
         fx.postQuote(keccak256(abi.encodePacked("EUR/ssUSD")), 1.0625e18, uint64(1 hours));
-        fx.postQuote(keccak256(abi.encodePacked("GBP/ssUSD")), 1.2700e18, uint64(1 hours));
+        fx.postQuote(keccak256(abi.encodePacked("GBP/ssUSD")), 1.27e18, uint64(1 hours));
         fx.postQuote(keccak256(abi.encodePacked("JPY/ssUSD")), 0.0064e18, uint64(1 hours));
-        fx.postQuote(keccak256(abi.encodePacked("MXN/ssUSD")), 0.0590e18, uint64(1 hours));
+        fx.postQuote(keccak256(abi.encodePacked("MXN/ssUSD")), 0.059e18, uint64(1 hours));
         vm.stopBroadcast();
 
         console.log("");

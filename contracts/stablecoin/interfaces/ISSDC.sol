@@ -68,11 +68,9 @@ interface ISSDC is IERC20 {
      * @param shares Shares to transfer
      * @return success True if successful
      */
-    function transferSharesFrom(
-        address from,
-        address to,
-        uint256 shares
-    ) external returns (bool success);
+    function transferSharesFrom(address from, address to, uint256 shares)
+        external
+        returns (bool success);
 
     // =========================================================================
     // Minting/Burning (TreasuryVault only)

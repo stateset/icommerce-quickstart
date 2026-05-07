@@ -20,7 +20,7 @@ contract FxOracleTest is Test {
         vm.prank(operator);
         oracle.postQuote(EUR_SSUSD, 1.0625e18, 1 hours);
 
-        (uint256 amountOut, uint256 rate, ) = oracle.convert(EUR_SSUSD, 100e18);
+        (uint256 amountOut, uint256 rate,) = oracle.convert(EUR_SSUSD, 100e18);
         assertEq(rate, 1.0625e18);
         assertEq(amountOut, 106.25e18);
     }
@@ -31,7 +31,7 @@ contract FxOracleTest is Test {
         oracle.postQuote(JPY_SSUSD, 0.0064e18, 1 hours);
 
         // 10,000 JPY → 64 ssUSD
-        (uint256 amountOut, , ) = oracle.convert(JPY_SSUSD, 10_000e18);
+        (uint256 amountOut,,) = oracle.convert(JPY_SSUSD, 10_000e18);
         assertEq(amountOut, 64e18);
     }
 

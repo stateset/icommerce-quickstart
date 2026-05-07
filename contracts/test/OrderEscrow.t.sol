@@ -30,8 +30,12 @@ contract OrderEscrowTest is Test {
         token.approve(address(escrow), AMOUNT);
         vm.prank(buyer);
         escrow.lock(
-            ORDER, seller, IERC20(address(token)), AMOUNT,
-            uint64(block.timestamp + 7 days), uint64(0)
+            ORDER,
+            seller,
+            IERC20(address(token)),
+            AMOUNT,
+            uint64(block.timestamp + 7 days),
+            uint64(0)
         );
         assertEq(token.balanceOf(address(escrow)), AMOUNT);
         assertEq(token.balanceOf(buyer), AMOUNT * 9);
@@ -51,8 +55,12 @@ contract OrderEscrowTest is Test {
         vm.startPrank(buyer);
         token.approve(address(escrow), AMOUNT);
         escrow.lock(
-            ORDER, seller, IERC20(address(token)), AMOUNT,
-            uint64(block.timestamp + 7 days), uint64(2 days)
+            ORDER,
+            seller,
+            IERC20(address(token)),
+            AMOUNT,
+            uint64(block.timestamp + 7 days),
+            uint64(2 days)
         );
         vm.stopPrank();
 
@@ -74,8 +82,12 @@ contract OrderEscrowTest is Test {
         vm.startPrank(buyer);
         token.approve(address(escrow), AMOUNT);
         escrow.lock(
-            ORDER, seller, IERC20(address(token)), AMOUNT,
-            uint64(block.timestamp + 1 days), uint64(0)
+            ORDER,
+            seller,
+            IERC20(address(token)),
+            AMOUNT,
+            uint64(block.timestamp + 1 days),
+            uint64(0)
         );
         vm.stopPrank();
 
@@ -95,13 +107,21 @@ contract OrderEscrowTest is Test {
         vm.startPrank(buyer);
         token.approve(address(escrow), AMOUNT * 2);
         escrow.lock(
-            ORDER, seller, IERC20(address(token)), AMOUNT,
-            uint64(block.timestamp + 7 days), uint64(0)
+            ORDER,
+            seller,
+            IERC20(address(token)),
+            AMOUNT,
+            uint64(block.timestamp + 7 days),
+            uint64(0)
         );
         vm.expectRevert(OrderEscrow.OrderExists.selector);
         escrow.lock(
-            ORDER, seller, IERC20(address(token)), AMOUNT,
-            uint64(block.timestamp + 7 days), uint64(0)
+            ORDER,
+            seller,
+            IERC20(address(token)),
+            AMOUNT,
+            uint64(block.timestamp + 7 days),
+            uint64(0)
         );
         vm.stopPrank();
     }
@@ -111,8 +131,12 @@ contract OrderEscrowTest is Test {
         vm.startPrank(buyer);
         token.approve(address(escrow), AMOUNT);
         escrow.lock(
-            ORDER, seller, IERC20(address(token)), AMOUNT,
-            uint64(block.timestamp + 7 days), uint64(2 days)
+            ORDER,
+            seller,
+            IERC20(address(token)),
+            AMOUNT,
+            uint64(block.timestamp + 7 days),
+            uint64(2 days)
         );
         vm.stopPrank();
         vm.prank(buyer);
@@ -138,8 +162,12 @@ contract OrderEscrowTest is Test {
         vm.startPrank(buyer);
         token.approve(address(escrow), AMOUNT);
         escrow.lock(
-            ORDER, seller, IERC20(address(token)), AMOUNT,
-            uint64(block.timestamp + 7 days), uint64(0)
+            ORDER,
+            seller,
+            IERC20(address(token)),
+            AMOUNT,
+            uint64(block.timestamp + 7 days),
+            uint64(0)
         );
         vm.stopPrank();
         vm.prank(buyer);
@@ -158,8 +186,12 @@ contract OrderEscrowTest is Test {
         vm.startPrank(buyer);
         token.approve(address(escrow), AMOUNT);
         escrow.lock(
-            ORDER, seller, IERC20(address(token)), AMOUNT,
-            uint64(block.timestamp + 7 days), uint64(0)
+            ORDER,
+            seller,
+            IERC20(address(token)),
+            AMOUNT,
+            uint64(block.timestamp + 7 days),
+            uint64(0)
         );
         vm.stopPrank();
         vm.prank(operator);
@@ -183,9 +215,14 @@ contract OrderEscrowTest is Test {
         vm.startPrank(buyer);
         token.approve(address(escrow), AMOUNT);
         escrow.lockWithFee(
-            ORDER, seller, IERC20(address(token)), AMOUNT,
-            uint64(block.timestamp + 7 days), uint64(0),
-            marketplace, FEE_BPS
+            ORDER,
+            seller,
+            IERC20(address(token)),
+            AMOUNT,
+            uint64(block.timestamp + 7 days),
+            uint64(0),
+            marketplace,
+            FEE_BPS
         );
         vm.stopPrank();
         vm.prank(buyer);
@@ -193,7 +230,7 @@ contract OrderEscrowTest is Test {
         vm.prank(seller);
         escrow.release(ORDER);
 
-        uint256 fee = (uint256(AMOUNT) * FEE_BPS) / 10000;
+        uint256 fee = (uint256(AMOUNT) * FEE_BPS) / 10_000;
         assertEq(token.balanceOf(marketplace), fee, "marketplace got fee");
         assertEq(token.balanceOf(seller), AMOUNT - fee, "seller got rest");
         assertEq(token.balanceOf(address(escrow)), 0);
@@ -204,9 +241,14 @@ contract OrderEscrowTest is Test {
         vm.startPrank(buyer);
         token.approve(address(escrow), AMOUNT);
         escrow.lockWithFee(
-            ORDER, seller, IERC20(address(token)), AMOUNT,
-            uint64(block.timestamp + 1 days), uint64(0),
-            marketplace, 500
+            ORDER,
+            seller,
+            IERC20(address(token)),
+            AMOUNT,
+            uint64(block.timestamp + 1 days),
+            uint64(0),
+            marketplace,
+            500
         );
         vm.stopPrank();
         vm.warp(block.timestamp + 1 days + 1);
@@ -223,9 +265,14 @@ contract OrderEscrowTest is Test {
         token.approve(address(escrow), AMOUNT);
         vm.expectRevert(abi.encodeWithSelector(OrderEscrow.FeeTooHigh.selector, 1500, 1000));
         escrow.lockWithFee(
-            ORDER, seller, IERC20(address(token)), AMOUNT,
-            uint64(block.timestamp + 1 days), uint64(0),
-            marketplace, 1500 // > 10% MAX_FEE_BPS
+            ORDER,
+            seller,
+            IERC20(address(token)),
+            AMOUNT,
+            uint64(block.timestamp + 1 days),
+            uint64(0),
+            marketplace,
+            1500 // > 10% MAX_FEE_BPS
         );
         vm.stopPrank();
     }
@@ -236,8 +283,12 @@ contract OrderEscrowTest is Test {
         vm.startPrank(buyer);
         token.approve(address(escrow), AMOUNT);
         escrow.lock(
-            ORDER, seller, IERC20(address(token)), AMOUNT,
-            uint64(block.timestamp + 7 days), uint64(0)
+            ORDER,
+            seller,
+            IERC20(address(token)),
+            AMOUNT,
+            uint64(block.timestamp + 7 days),
+            uint64(0)
         );
         vm.stopPrank();
         assertEq(escrow.totalLocked(address(token)), AMOUNT);
@@ -276,8 +327,12 @@ contract OrderEscrowTest is Test {
         vm.startPrank(buyer);
         token.approve(address(escrow), AMOUNT);
         escrow.lock(
-            ORDER, seller, IERC20(address(token)), AMOUNT,
-            uint64(block.timestamp + 7 days), uint64(0)
+            ORDER,
+            seller,
+            IERC20(address(token)),
+            AMOUNT,
+            uint64(block.timestamp + 7 days),
+            uint64(0)
         );
         vm.stopPrank();
         vm.prank(operator);

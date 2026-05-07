@@ -33,10 +33,7 @@ contract SetRegistryTest is Test {
         registryImpl = new SetRegistry();
 
         // Deploy proxy
-        bytes memory initData = abi.encodeCall(
-            SetRegistry.initialize,
-            (owner, sequencer)
-        );
+        bytes memory initData = abi.encodeCall(SetRegistry.initialize, (owner, sequencer));
         ERC1967Proxy proxy = new ERC1967Proxy(address(registryImpl), initData);
         registry = SetRegistry(address(proxy));
     }
@@ -54,10 +51,7 @@ contract SetRegistryTest is Test {
 
     function test_Initialize_WithZeroSequencer() public {
         SetRegistry impl = new SetRegistry();
-        bytes memory initData = abi.encodeCall(
-            SetRegistry.initialize,
-            (owner, address(0))
-        );
+        bytes memory initData = abi.encodeCall(SetRegistry.initialize, (owner, address(0)));
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         SetRegistry reg = SetRegistry(address(proxy));
 
@@ -127,9 +121,9 @@ contract SetRegistryTest is Test {
             eventsRoot,
             prevStateRoot,
             newStateRoot,
-            1,  // sequenceStart
+            1, // sequenceStart
             10, // sequenceEnd
-            10  // eventCount
+            10 // eventCount
         );
 
         // Verify commitment stored
@@ -148,7 +142,6 @@ contract SetRegistryTest is Test {
         assertEq(seqEnd, 10);
         assertEq(eventCount, 10);
         assertGt(timestamp, 0);
-
     }
 
     function test_CommitBatchWithStarkProof() public {
@@ -207,7 +200,6 @@ contract SetRegistryTest is Test {
         assertTrue(allCompliant);
         assertEq(proofSize, 1024);
         assertEq(provingTimeMs, 500);
-
     }
 
     function test_CommitStarkProof() public {
@@ -219,28 +211,12 @@ contract SetRegistryTest is Test {
 
         vm.prank(sequencer);
         registry.commitBatch(
-            batchId,
-            tenantId,
-            storeId,
-            keccak256("events"),
-            prevStateRoot,
-            newStateRoot,
-            1,
-            10,
-            10
+            batchId, tenantId, storeId, keccak256("events"), prevStateRoot, newStateRoot, 1, 10, 10
         );
 
         vm.prank(sequencer);
         registry.commitStarkProof(
-            batchId,
-            proofHash,
-            prevStateRoot,
-            newStateRoot,
-            policyHash,
-            100,
-            true,
-            1024,
-            500
+            batchId, proofHash, prevStateRoot, newStateRoot, policyHash, 100, true, 1024, 500
         );
 
         assertTrue(registry.hasStarkProof(batchId));
@@ -255,15 +231,7 @@ contract SetRegistryTest is Test {
 
         vm.prank(sequencer);
         registry.commitBatch(
-            batchId,
-            tenantId,
-            storeId,
-            keccak256("events"),
-            prevStateRoot,
-            newStateRoot,
-            1,
-            10,
-            10
+            batchId, tenantId, storeId, keccak256("events"), prevStateRoot, newStateRoot, 1, 10, 10
         );
 
         vm.prank(sequencer);
@@ -342,25 +310,9 @@ contract SetRegistryTest is Test {
 
         vm.prank(sequencer);
         vm.expectEmit(true, true, false, true);
-        emit BatchCommitted(
-            batchId,
-            tenantStoreKey,
-            eventsRoot,
-            newStateRoot,
-            1,
-            10,
-            10
-        );
+        emit BatchCommitted(batchId, tenantStoreKey, eventsRoot, newStateRoot, 1, 10, 10);
         registry.commitBatch(
-            batchId,
-            tenantId,
-            storeId,
-            eventsRoot,
-            bytes32(0),
-            newStateRoot,
-            1,
-            10,
-            10
+            batchId, tenantId, storeId, eventsRoot, bytes32(0), newStateRoot, 1, 10, 10
         );
     }
 
@@ -371,15 +323,7 @@ contract SetRegistryTest is Test {
 
         vm.prank(sequencer);
         registry.commitBatch(
-            batchId,
-            tenantId,
-            storeId,
-            keccak256("events"),
-            bytes32(0),
-            newStateRoot,
-            1,
-            10,
-            10
+            batchId, tenantId, storeId, keccak256("events"), bytes32(0), newStateRoot, 1, 10, 10
         );
 
         assertEq(registry.latestCommitment(tenantStoreKey), batchId);
@@ -421,11 +365,7 @@ contract SetRegistryTest is Test {
     function test_CommitBatch_InvalidEventCount() public {
         vm.prank(sequencer);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                SetRegistry.InvalidEventCount.selector,
-                uint64(10),
-                uint32(9)
-            )
+            abi.encodeWithSelector(SetRegistry.InvalidEventCount.selector, uint64(10), uint32(9))
         );
         registry.commitBatch(
             keccak256("batch1"),
@@ -501,15 +441,7 @@ contract SetRegistryTest is Test {
 
         // First batch
         registry.commitBatch(
-            batch1,
-            tenantId,
-            storeId,
-            keccak256("events1"),
-            bytes32(0),
-            state1,
-            1,
-            10,
-            10
+            batch1, tenantId, storeId, keccak256("events1"), bytes32(0), state1, 1, 10, 10
         );
 
         // Second batch - prevStateRoot must match first batch's newStateRoot
@@ -518,15 +450,14 @@ contract SetRegistryTest is Test {
             tenantId,
             storeId,
             keccak256("events2"),
-            state1,  // prevStateRoot matches state1
+            state1, // prevStateRoot matches state1
             state2,
-            11,      // sequenceStart must be sequenceEnd + 1
+            11, // sequenceStart must be sequenceEnd + 1
             20,
             10
         );
 
         vm.stopPrank();
-
     }
 
     function test_CommitBatch_StateRootMismatch() public {
@@ -538,30 +469,18 @@ contract SetRegistryTest is Test {
         vm.startPrank(sequencer);
 
         registry.commitBatch(
-            batch1,
-            tenantId,
-            storeId,
-            keccak256("events1"),
-            bytes32(0),
-            state1,
-            1,
-            10,
-            10
+            batch1, tenantId, storeId, keccak256("events1"), bytes32(0), state1, 1, 10, 10
         );
 
         vm.expectRevert(
-            abi.encodeWithSelector(
-                SetRegistry.StateRootMismatch.selector,
-                state1,
-                wrongPrevState
-            )
+            abi.encodeWithSelector(SetRegistry.StateRootMismatch.selector, state1, wrongPrevState)
         );
         registry.commitBatch(
             batch2,
             tenantId,
             storeId,
             keccak256("events2"),
-            wrongPrevState,  // Doesn't match state1
+            wrongPrevState, // Doesn't match state1
             keccak256("state2"),
             11,
             20,
@@ -579,22 +498,14 @@ contract SetRegistryTest is Test {
         vm.startPrank(sequencer);
 
         registry.commitBatch(
-            batch1,
-            tenantId,
-            storeId,
-            keccak256("events1"),
-            bytes32(0),
-            state1,
-            1,
-            10,
-            10
+            batch1, tenantId, storeId, keccak256("events1"), bytes32(0), state1, 1, 10, 10
         );
 
         vm.expectRevert(
             abi.encodeWithSelector(
                 SetRegistry.SequenceGap.selector,
-                11,  // expected
-                15   // provided
+                11, // expected
+                15 // provided
             )
         );
         registry.commitBatch(
@@ -604,7 +515,7 @@ contract SetRegistryTest is Test {
             keccak256("events2"),
             state1,
             keccak256("state2"),
-            15,  // Gap! Should be 11
+            15, // Gap! Should be 11
             20,
             6
         );
@@ -640,15 +551,14 @@ contract SetRegistryTest is Test {
             tenantId,
             storeId,
             keccak256("events2"),
-            keccak256("wrong"),  // Mismatched state root - allowed when strict mode off
+            keccak256("wrong"), // Mismatched state root - allowed when strict mode off
             keccak256("state2"),
-            100,  // Big gap - allowed when strict mode off
+            100, // Big gap - allowed when strict mode off
             110,
             11
         );
 
         vm.stopPrank();
-
     }
 
     // =========================================================================
@@ -670,15 +580,7 @@ contract SetRegistryTest is Test {
         bytes32 batchId = keccak256("batch1");
         vm.prank(sequencer);
         registry.commitBatch(
-            batchId,
-            tenantId,
-            storeId,
-            root,
-            bytes32(0),
-            keccak256("state"),
-            1,
-            4,
-            4
+            batchId, tenantId, storeId, root, bytes32(0), keccak256("state"), 1, 4, 4
         );
 
         // Verify leaf0 (index 0)
@@ -713,15 +615,7 @@ contract SetRegistryTest is Test {
         bytes32 batchId = keccak256("batch1");
         vm.prank(sequencer);
         registry.commitBatch(
-            batchId,
-            tenantId,
-            storeId,
-            root,
-            bytes32(0),
-            keccak256("state"),
-            1,
-            2,
-            2
+            batchId, tenantId, storeId, root, bytes32(0), keccak256("state"), 1, 2, 2
         );
 
         // Wrong proof
@@ -734,14 +628,7 @@ contract SetRegistryTest is Test {
         bytes32[] memory proof = new bytes32[](1);
         proof[0] = keccak256("sibling");
 
-        assertFalse(
-            registry.verifyInclusion(
-                keccak256("nonexistent"),
-                keccak256("leaf"),
-                proof,
-                0
-            )
-        );
+        assertFalse(registry.verifyInclusion(keccak256("nonexistent"), keccak256("leaf"), proof, 0));
     }
 
     function test_VerifyMultipleInclusions() public {
@@ -754,15 +641,7 @@ contract SetRegistryTest is Test {
         bytes32 batchId = keccak256("batch1");
         vm.prank(sequencer);
         registry.commitBatch(
-            batchId,
-            tenantId,
-            storeId,
-            root,
-            bytes32(0),
-            keccak256("state"),
-            1,
-            2,
-            2
+            batchId, tenantId, storeId, root, bytes32(0), keccak256("state"), 1, 2, 2
         );
 
         // Verify both leaves
@@ -787,15 +666,7 @@ contract SetRegistryTest is Test {
         bytes32 batchId = keccak256("batch1");
         vm.prank(sequencer);
         registry.commitBatch(
-            batchId,
-            tenantId,
-            storeId,
-            keccak256("root"),
-            bytes32(0),
-            keccak256("state"),
-            1,
-            1,
-            1
+            batchId, tenantId, storeId, keccak256("root"), bytes32(0), keccak256("state"), 1, 1, 1
         );
 
         bytes32[] memory leaves = new bytes32[](2);
@@ -815,25 +686,14 @@ contract SetRegistryTest is Test {
 
         vm.prank(sequencer);
         registry.commitBatch(
-            batchId,
-            tenantId,
-            storeId,
-            keccak256("events"),
-            bytes32(0),
-            newStateRoot,
-            1,
-            10,
-            10
+            batchId, tenantId, storeId, keccak256("events"), bytes32(0), newStateRoot, 1, 10, 10
         );
 
         assertEq(registry.getLatestStateRoot(tenantId, storeId), newStateRoot);
     }
 
     function test_GetLatestStateRoot_NoCommitments() public view {
-        assertEq(
-            registry.getLatestStateRoot(tenantId, storeId),
-            bytes32(0)
-        );
+        assertEq(registry.getLatestStateRoot(tenantId, storeId), bytes32(0));
     }
 
     function test_GetHeadSequence() public {
@@ -869,7 +729,6 @@ contract SetRegistryTest is Test {
 
         vm.prank(sequencer);
         registry.registerBatchRoot(1, 10, keccak256("root"));
-
     }
 
     function test_GetBatchRoot_Legacy() public {
@@ -918,9 +777,9 @@ contract SetRegistryTest is Test {
             tenant2,
             store1,
             keccak256("events2"),
-            bytes32(0),  // Independent state chain
+            bytes32(0), // Independent state chain
             state2,
-            1,  // Can also start at 1
+            1, // Can also start at 1
             5,
             5
         );
@@ -989,15 +848,7 @@ contract SetRegistryTest is Test {
 
         vm.prank(sequencer);
         registry.commitBatch(
-            batchId,
-            tenantId,
-            storeId,
-            eventsRoot,
-            bytes32(0),
-            newStateRoot,
-            1,
-            10,
-            10
+            batchId, tenantId, storeId, eventsRoot, bytes32(0), newStateRoot, 1, 10, 10
         );
 
         SetRegistry.BatchCommitment memory commitment = registry.getBatchCommitment(batchId);
@@ -1052,12 +903,8 @@ contract SetRegistryTest is Test {
     }
 
     function test_GetRegistryStats() public {
-        (
-            uint256 commitmentCount,
-            uint256 proofCount,
-            bool isPaused,
-            bool isStrictMode
-        ) = registry.getRegistryStats();
+        (uint256 commitmentCount, uint256 proofCount, bool isPaused, bool isStrictMode) =
+            registry.getRegistryStats();
 
         assertEq(commitmentCount, 0);
         assertEq(proofCount, 0);
@@ -1099,11 +946,8 @@ contract SetRegistryTest is Test {
             10
         );
 
-        (
-            SetRegistry.BatchCommitment memory commitment,
-            bool hasProof,
-            bool proofCompliant
-        ) = registry.getBatchWithProofStatus(batchId);
+        (SetRegistry.BatchCommitment memory commitment, bool hasProof, bool proofCompliant) =
+            registry.getBatchWithProofStatus(batchId);
 
         assertEq(commitment.eventsRoot, keccak256("events"));
         assertFalse(hasProof);

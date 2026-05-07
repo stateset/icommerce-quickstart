@@ -12,12 +12,7 @@ import "./interfaces/ISSDC.sol";
  * @notice Oracle for T-Bill Net Asset Value attestation
  * @dev Company attests daily NAV of T-Bill holdings backing SSDC
  */
-contract NAVOracle is
-    INAVOracle,
-    Initializable,
-    OwnableUpgradeable,
-    UUPSUpgradeable
-{
+contract NAVOracle is INAVOracle, Initializable, OwnableUpgradeable, UUPSUpgradeable {
     // =========================================================================
     // Constants
     // =========================================================================
@@ -29,7 +24,7 @@ contract NAVOracle is
     uint256 public constant INITIAL_NAV_PER_SHARE = 1e18;
 
     /// @notice Basis points denominator
-    uint256 public constant BPS_DENOMINATOR = 10000;
+    uint256 public constant BPS_DENOMINATOR = 10_000;
 
     /// @notice Default maximum NAV change per attestation (5%)
     uint256 public constant DEFAULT_MAX_NAV_CHANGE_BPS = 500;
@@ -134,11 +129,10 @@ contract NAVOracle is
      * @param attestor_ Initial attestor address
      * @param maxStaleness_ Maximum staleness in seconds
      */
-    function initialize(
-        address owner_,
-        address attestor_,
-        uint256 maxStaleness_
-    ) public initializer {
+    function initialize(address owner_, address attestor_, uint256 maxStaleness_)
+        public
+        initializer
+    {
         __Ownable_init(owner_);
         __UUPSUpgradeable_init();
 
@@ -170,9 +164,21 @@ contract NAVOracle is
     // Attestation (Multi-Sig)
     // =========================================================================
 
-    event AttestationSubmitted(bytes32 indexed attestationKey, address indexed attestor, uint256 totalAssets, uint256 reportDate);
-    event AttestationSigned(bytes32 indexed attestationKey, address indexed attestor, uint256 signatureCount, uint256 threshold);
-    event AttestationFinalized(bytes32 indexed attestationKey, uint256 totalAssets, uint256 navPerShare);
+    event AttestationSubmitted(
+        bytes32 indexed attestationKey,
+        address indexed attestor,
+        uint256 totalAssets,
+        uint256 reportDate
+    );
+    event AttestationSigned(
+        bytes32 indexed attestationKey,
+        address indexed attestor,
+        uint256 signatureCount,
+        uint256 threshold
+    );
+    event AttestationFinalized(
+        bytes32 indexed attestationKey, uint256 totalAssets, uint256 navPerShare
+    );
     event AttestationExpiredEvent(bytes32 indexed attestationKey);
     event ThresholdUpdated(uint256 oldThreshold, uint256 newThreshold);
     event PendingExpiryUpdated(uint256 oldExpiry, uint256 newExpiry);
@@ -187,11 +193,10 @@ contract NAVOracle is
      * @dev When threshold > 1, this creates/signs a pending attestation
      *      When threshold = 1, this directly applies the NAV (backwards compatible)
      */
-    function attestNAV(
-        uint256 totalAssets,
-        uint256 reportDate,
-        bytes32 proofHash
-    ) external onlyAttestor {
+    function attestNAV(uint256 totalAssets, uint256 reportDate, bytes32 proofHash)
+        external
+        onlyAttestor
+    {
         if (totalAssets == 0) revert InvalidTotalAssets();
         if (reportDate <= _currentNAV.reportDate) revert ReportDateNotNew();
 
@@ -246,7 +251,9 @@ contract NAVOracle is
 
         hasAttested[attestationKey][msg.sender] = true;
 
-        emit AttestationSigned(attestationKey, msg.sender, pending.attestationCount, attestationThreshold);
+        emit AttestationSigned(
+            attestationKey, msg.sender, pending.attestationCount, attestationThreshold
+        );
 
         // Check if threshold reached
         if (pending.attestationCount >= attestationThreshold) {
@@ -325,15 +332,19 @@ contract NAVOracle is
      * @return expiresAt When the pending attestation expires
      * @return isActive Whether there's an active pending attestation
      */
-    function getPendingAttestation() external view returns (
-        bytes32 key,
-        uint256 totalAssets,
-        uint256 reportDate,
-        uint256 signatureCount,
-        uint256 threshold,
-        uint256 expiresAt,
-        bool isActive
-    ) {
+    function getPendingAttestation()
+        external
+        view
+        returns (
+            bytes32 key,
+            uint256 totalAssets,
+            uint256 reportDate,
+            uint256 signatureCount,
+            uint256 threshold,
+            uint256 expiresAt,
+            bool isActive
+        )
+    {
         key = currentPendingKey;
         threshold = attestationThreshold;
 
@@ -427,10 +438,7 @@ contract NAVOracle is
      * @notice Set attestor authorization
      * @dev Updates attestorCount for multi-sig threshold validation
      */
-    function setAuthorizedAttestor(
-        address attestor,
-        bool authorized
-    ) external onlyOwner {
+    function setAuthorizedAttestor(address attestor, bool authorized) external onlyOwner {
         if (attestor == address(0)) revert InvalidAddress();
 
         bool wasAuthorized = authorizedAttestors[attestor];
@@ -556,14 +564,18 @@ contract NAVOracle is
      * @return totalAssets Current total assets
      * @return configuredMaxChange Maximum allowed NAV change (bps)
      */
-    function getOracleStatus() external view returns (
-        uint256 navPerShare,
-        uint256 lastUpdate,
-        bool isFresh,
-        uint256 reportDate,
-        uint256 totalAssets,
-        uint256 configuredMaxChange
-    ) {
+    function getOracleStatus()
+        external
+        view
+        returns (
+            uint256 navPerShare,
+            uint256 lastUpdate,
+            bool isFresh,
+            uint256 reportDate,
+            uint256 totalAssets,
+            uint256 configuredMaxChange
+        )
+    {
         return (
             _currentNAV.navPerShare,
             _currentNAV.timestamp,
@@ -601,10 +613,10 @@ contract NAVOracle is
      * @param attestors Array of attestor addresses
      * @param authorized Array of authorization flags
      */
-    function batchSetAuthorizedAttestors(
-        address[] calldata attestors,
-        bool[] calldata authorized
-    ) external onlyOwner {
+    function batchSetAuthorizedAttestors(address[] calldata attestors, bool[] calldata authorized)
+        external
+        onlyOwner
+    {
         if (attestors.length == 0) revert EmptyArray();
         if (attestors.length != authorized.length) revert ArrayLengthMismatch();
 
@@ -634,9 +646,11 @@ contract NAVOracle is
      * @param addresses Array of addresses to check
      * @return authorized Array of authorization flags
      */
-    function batchIsAuthorized(
-        address[] calldata addresses
-    ) external view returns (bool[] memory authorized) {
+    function batchIsAuthorized(address[] calldata addresses)
+        external
+        view
+        returns (bool[] memory authorized)
+    {
         authorized = new bool[](addresses.length);
         for (uint256 i = 0; i < addresses.length; i++) {
             authorized[i] = authorizedAttestors[addresses[i]];
@@ -656,13 +670,17 @@ contract NAVOracle is
      * @return volatility Standard deviation estimate (simplified)
      * @return historyCount Number of historical reports
      */
-    function getNAVStatistics() external view returns (
-        uint256 avgNav,
-        uint256 minNav,
-        uint256 maxNav,
-        uint256 volatility,
-        uint256 historyCount
-    ) {
+    function getNAVStatistics()
+        external
+        view
+        returns (
+            uint256 avgNav,
+            uint256 minNav,
+            uint256 maxNav,
+            uint256 volatility,
+            uint256 historyCount
+        )
+    {
         historyCount = _navHistory.length;
 
         if (historyCount == 0) {
@@ -698,12 +716,11 @@ contract NAVOracle is
      * @return changeBps Change in basis points
      * @return isPositive True if NAV increased
      */
-    function getNAVTrend() external view returns (
-        uint256 currentNav,
-        uint256 previousNav,
-        uint256 changeBps,
-        bool isPositive
-    ) {
+    function getNAVTrend()
+        external
+        view
+        returns (uint256 currentNav, uint256 previousNav, uint256 changeBps, bool isPositive)
+    {
         currentNav = _currentNAV.navPerShare;
 
         if (_navHistory.length == 0) {
@@ -741,9 +758,11 @@ contract NAVOracle is
      * @return yieldBps Yield in basis points
      * @return yieldAmount Yield amount per share
      */
-    function getCumulativeYield(
-        uint256 baselineNav
-    ) external view returns (uint256 yieldBps, uint256 yieldAmount) {
+    function getCumulativeYield(uint256 baselineNav)
+        external
+        view
+        returns (uint256 yieldBps, uint256 yieldAmount)
+    {
         uint256 currentNav = _currentNAV.navPerShare;
 
         if (currentNav > baselineNav) {
@@ -759,10 +778,11 @@ contract NAVOracle is
      * @return annualizedBps Estimated annualized yield in basis points
      * @return periodDays Number of days in calculation period
      */
-    function getAnnualizedYield() external view returns (
-        uint256 annualizedBps,
-        uint256 periodDays
-    ) {
+    function getAnnualizedYield()
+        external
+        view
+        returns (uint256 annualizedBps, uint256 periodDays)
+    {
         if (_navHistory.length == 0) {
             return (0, 0);
         }
@@ -798,10 +818,11 @@ contract NAVOracle is
      * @param endDate End date (YYYYMMDD format)
      * @return reports Array of NAV reports in range
      */
-    function getNAVHistoryInRange(
-        uint256 startDate,
-        uint256 endDate
-    ) external view returns (NAVReport[] memory reports) {
+    function getNAVHistoryInRange(uint256 startDate, uint256 endDate)
+        external
+        view
+        returns (NAVReport[] memory reports)
+    {
         // Count matching reports
         uint256 count = 0;
         for (uint256 i = 0; i < _navHistory.length; i++) {
@@ -811,7 +832,8 @@ contract NAVOracle is
         }
 
         // Include current NAV if in range
-        bool includesCurrent = _currentNAV.reportDate >= startDate && _currentNAV.reportDate <= endDate;
+        bool includesCurrent =
+            _currentNAV.reportDate >= startDate && _currentNAV.reportDate <= endDate;
         if (includesCurrent) count++;
 
         // Build result array
@@ -839,13 +861,17 @@ contract NAVOracle is
      * @return SSDCLinked SSDC contract is linked
      * @return healthScore Overall health score (0-100)
      */
-function getOracleHealth() external view returns (
-        bool isFresh,
-        bool hasHistory,
-        bool hasAttestor,
-        bool SSDCLinked,
-        uint256 healthScore
-    ) {
+    function getOracleHealth()
+        external
+        view
+        returns (
+            bool isFresh,
+            bool hasHistory,
+            bool hasAttestor,
+            bool SSDCLinked,
+            uint256 healthScore
+        )
+    {
         isFresh = block.timestamp <= _currentNAV.timestamp + maxStalenessSeconds;
         hasHistory = _navHistory.length > 0;
         hasAttestor = authorizedAttestors[_currentNAV.attestor];
@@ -867,9 +893,7 @@ function getOracleHealth() external view returns (
     /**
      * @dev Authorize upgrade (owner only)
      */
-    function _authorizeUpgrade(
-        address newImplementation
-    ) internal override onlyOwner {
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
         emit ContractUpgraded(newImplementation, msg.sender);
     }
 
