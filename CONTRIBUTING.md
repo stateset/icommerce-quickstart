@@ -30,7 +30,12 @@ If your change crosses those boundaries, please open an issue first to discuss.
 ```bash
 # Clone + bring up the stack
 git clone https://github.com/stateset/icommerce-quickstart && cd icommerce-quickstart
+bash stack/setup.sh
 ./stack/stateset up
+
+# Optional but recommended: install the pre-commit hook
+# (runs forge fmt --check + node --check on staged files)
+bash scripts/install-hooks.sh
 
 # Run all tests
 ./stack/stateset test

@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+- `scripts/install-hooks.sh` — installs a git `pre-commit` hook that runs `forge fmt --check` on staged Solidity files, `node --check` on staged JS files, and `bash -n` on staged shell files. Catches formatting/syntax issues locally before push, instead of after a 5-minute CI round-trip. Bypass per-commit with `git commit --no-verify`. Documented in CONTRIBUTING.md as recommended.
+
 ## [0.4.0] — 2026-05-07
 
 The "every commerce contract under test" release. Test count more than doubled (93 → 216) by lifting the upstream tests for the two contracts that had zero coverage in this quickstart.
