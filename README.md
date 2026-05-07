@@ -30,8 +30,8 @@ bash stack/setup.sh
 # 2. Watch the protocol settle a $1500 order end-to-end
 ./stack/stateset demo lifecycle
 
-# 3. Verify the produced receipt independently
-./stack/stateset demo verify demos/fixtures/agent-receipt.json
+# 3. Verify a receipt independently (defaults to the bundled fixture)
+./stack/stateset audit
 ```
 
 > Want to see what each command's output should look like before running? See [`docs/EXAMPLE_RUN.md`](./docs/EXAMPLE_RUN.md).
@@ -109,7 +109,8 @@ The bridges talk to the on-chain `FxOracle` for both legs, so an auditor can rep
 Three layers of independent verification — schema, on-chain, STARK:
 
 ```bash
-./stack/stateset demo verify demos/fixtures/agent-receipt.json
+./stack/stateset audit                          # bundled fixture
+./stack/stateset audit ~/inbox/receipt.json     # any receipt you receive
 ```
 
 No StateSet-operated server. The trust roots are: the JSON Schemas (in this repo), your RPC URL, and the open-source `ves-stark` binary (build it from [stateset-starks](https://github.com/stateset/stateset-starks)).
