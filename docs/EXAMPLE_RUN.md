@@ -103,11 +103,28 @@ $ ./stack/stateset doctor
   OK    contracts deployed
   OK    on-ramp
   OK    off-ramp
+  OK    FX quotes fresh (4/4 pairs)
   OK    schemas/ present (3 files)
   !     ves-stark not on PATH (set STARK_BIN if you have it; only needed for compliance bundles)
 ```
 
-`--fix` auto-remediates: re-deploys contracts if missing, restarts bridges if stopped.
+`--fix` auto-remediates: re-deploys contracts if missing, restarts bridges if stopped, re-seeds stale FX quotes.
+
+Companion command — `./stack/stateset show` — prints the chain-state view:
+
+```text
+Chain state @ http://localhost:8545
+  block             50931
+  SSDC              0xa51c1fc2f0d1a1b8494ed1fe312d7c3a78ed91c0
+    totalSupply     110000.00 SSDC
+  NAVOracle         0xb0d4afd8879ed9f52b28595d31b441d079b2ca07
+    NAV/share       $1.00
+  FxOracle          0x96f3ce39ad2bfdcf92c0f6e2c2cabf83874660fc
+    ✓ EUR/ssUSD → 1.0625 ssUSD/unit
+    ✓ GBP/ssUSD → 1.27 ssUSD/unit
+    ✓ JPY/ssUSD → 0.0064 ssUSD/unit
+    ✓ MXN/ssUSD → 0.059 ssUSD/unit
+```
 
 ---
 
@@ -118,10 +135,12 @@ $ ./stack/stateset test
 
   → contracts (forge test)…
   Suite result: ok. 13 passed; 0 failed; 0 skipped (OrderEscrow)
-  Suite result: ok. 7 passed; 0 failed; 0 skipped (FxOracle)
+  Suite result: ok.  7 passed; 0 failed; 0 skipped (FxOracle)
   Suite result: ok. 27 passed; 0 failed; 0 skipped (NAVOracle)
   Suite result: ok. 46 passed; 0 failed; 0 skipped (SetRegistry)
-  Ran 4 test suites: 93 tests passed, 0 failed, 0 skipped (93 total)
+  Suite result: ok. 48 passed; 0 failed; 0 skipped (SetPaymaster)
+  Suite result: ok. 75 passed; 0 failed; 0 skipped (SetPaymentBatch)
+  Ran 6 test suites: 216 tests passed, 0 failed, 0 skipped (216 total)
 
   → bridges (node --test)…
   ℹ tests 35
