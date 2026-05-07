@@ -54,7 +54,7 @@ That's it. You now have a working StateSet iCommerce stack on your machine.
 
 | Directory | Contents |
 |---|---|
-| **[`contracts/`](./contracts)** | The 6 Solidity contracts (OrderEscrow, FxOracle, SetRegistry, SSDC, NAVOracle, SetPaymaster) + Foundry config + **93 tests** + deploy scripts |
+| **[`contracts/`](./contracts)** | The 6 Solidity contracts (OrderEscrow, FxOracle, SetRegistry, SSDC, NAVOracle, SetPaymaster) + Foundry config + **216 tests** + deploy scripts |
 | **[`bridges/`](./bridges)** | Fiat ↔ SSDC bridges. Stripe webhook on-ramp + Stripe Treasury off-ramp. **35 unit tests pass standalone** (no chain required). Multi-currency: USD/EUR/GBP/JPY/MXN |
 | **[`demos/`](./demos)** | Three runnable demos:<br>• **`escrow-lifecycle`** — buyer locks, seller delivers, buyer releases (no sequencer, no STARK — just escrow)<br>• **`realmoney-loop`** — full fiat→SSDC→escrow→SSDC→fiat cycle, multi-currency<br>• **`verify-receipt`** — independent audit of any receipt |
 | **[`schemas/`](./schemas)** | The 3 JSON Schemas: agent-receipt.v1, compliance-bundle.v1, cross-border-receipt.v1 |
