@@ -202,16 +202,23 @@ try {
   const orderId = solidityPackedKeccak256(['string'], [orderText]);
   const chainNow = (await provider.getBlock('latest')).timestamp;
 
-  await (await ssdcAsBuyer.approve(escrowAddr, orderTotal)).wait();
+  // Explicit nonce passing — same iter-9 fix as escrow-lifecycle. ethers'
+  // internal nonce manager and anvil's pending-pool reporting can briefly
+  // disagree right after a tx mines; without explicit nonces, multi-tx
+  // demos like this one race in fast environments (CI especially).
+  let buyerNonce  = await provider.getTransactionCount(buyer.address);
+  let sellerNonce = await provider.getTransactionCount(seller.address);
+
+  await (await ssdcAsBuyer.approve(escrowAddr, orderTotal, { nonce: buyerNonce++ })).wait();
   const lockRcpt = await (await escrowAsBuyer.lock(
     orderId, seller.address, ssdcProxy, orderTotal,
-    chainNow + 7 * 24 * 3600, 0, { gasLimit: 600_000n },
+    chainNow + 7 * 24 * 3600, 0, { gasLimit: 600_000n, nonce: buyerNonce++ },
   )).wait();
   console.log(`  ${C.green}✓${C.reset} buyer locked $${fmt(orderTotal)} SSDC in escrow  ${C.dim}tx ${lockRcpt.hash.slice(0, 16)}…${C.reset}`);
 
   const receiptHash = keccak256(toUtf8Bytes(`${orderText}:delivered`));
-  await (await escrowAsBuyer.markDelivered(orderId, receiptHash, { gasLimit: 200_000n })).wait();
-  const releaseRcpt = await (await escrowAsSeller.release(orderId, { gasLimit: 300_000n })).wait();
+  await (await escrowAsBuyer.markDelivered(orderId, receiptHash, { gasLimit: 200_000n, nonce: buyerNonce++ })).wait();
+  const releaseRcpt = await (await escrowAsSeller.release(orderId, { gasLimit: 300_000n, nonce: sellerNonce++ })).wait();
   console.log(`  ${C.green}✓${C.reset} seller released funds  ${C.dim}tx ${releaseRcpt.hash.slice(0, 16)}…${C.reset}`);
   console.log(`     ${C.dim}seller balance: ${fmt(await ssdc.balanceOf(seller.address))} SSDC${C.reset}`);
 
@@ -229,7 +236,10 @@ try {
   const bridgeTreasury = bridgeHealth.bridge_treasury;
 
   // Seller pre-approves the bridge as SSDC spender
-  const approveTx = await ssdcAsBuyer.connect(seller).approve(bridgeTreasury, parseUnits('100000', 18));
+  const approveTx = await ssdcAsBuyer.connect(seller).approve(
+    bridgeTreasury, parseUnits('100000', 18),
+    { nonce: sellerNonce++ },
+  );
   await approveTx.wait();
 
   // Seller signs canonical payout message — same format the bridge re-derives.

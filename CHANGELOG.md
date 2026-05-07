@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file. Format foll
 ## [Unreleased]
 
 ### Fixed
+- `realmoney-loop` demo — applied the iter-9 explicit-nonce pattern to phase-2 buyer txs (approve, lock, markDelivered) + phase-3 seller approve. Without this, the same ethers↔anvil nonce race that bit `escrow-lifecycle` in CI can hit anyone running this demo on a fast environment (especially CI). Same fix as iter-9: fetch nonce from chain at phase start, pass `nonce: ...` explicitly on every tx.
 - `release.sh`: distinguish **in-progress CI** from **gh-unreachable**. Previously a still-running CI run on `main` would silently warn-and-skip the green-CI check; now it refuses with a clear error and prints the `gh run watch` command to wait. Catches the case where you tag right after a push and the CI run hasn't completed yet.
 
 ### Added
