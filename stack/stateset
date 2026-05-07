@@ -45,6 +45,7 @@ ${B}stateset${X} — local-stack orchestrator
   ${C}demo <name>${X}       lifecycle | realmoney | verify
 
   ${C}test${X}              contracts + bridges + demos
+  ${C}gates${X}             run every non-chain CI gate locally (preview a push)
   ${C}bench${X}             forge gas reports for the deployed contracts
   ${C}doctor${X} [--fix]    health check; --fix auto-remediates
   ${C}version${X}           print versions of forge, node, cast, this CLI
@@ -255,6 +256,53 @@ case "${1:-}" in
     info "running forge test --gas-report (this is slower than 'test')…"
     (cd "$ROOT/contracts" && forge test --gas-report --no-match-path 'lib/**' 2>&1 | grep -E "^\| (src/|contracts/|test/|│ )" | head -120 || true)
     ok "bench complete (above tables are gas usage per function call)"
+    ;;
+
+  gates)
+    # Local preview of CI's non-chain gates. Run this before `git push` to
+    # catch failures locally instead of waiting 5 min for the CI round-trip.
+    # Mirrors `.github/workflows/ci.yml` exactly:
+    #   contracts: forge fmt --check + forge build --sizes + forge test
+    #   bridges:   npm test
+    #   demos:     syntax + validate-fixture (e2e steps need anvil; skipped here)
+    failed=0
+
+    info "[1/5] forge fmt --check"
+    if (cd "$ROOT/contracts" && forge fmt --check >/dev/null 2>&1); then ok "forge fmt clean"
+    else bad "forge fmt has diffs (run: cd contracts && forge fmt)"; failed=$((failed+1)); fi
+
+    info "[2/5] forge build --sizes"
+    if (cd "$ROOT/contracts" && forge build --skip test --sizes >/dev/null 2>&1); then ok "forge build clean"
+    else bad "forge build failed"; failed=$((failed+1)); fi
+
+    info "[3/5] forge test"
+    if (cd "$ROOT/contracts" && forge test --no-match-path 'lib/**' 2>&1 | tail -1 | grep -qE "^Ran .* test suites? in"); then
+      passed=$(cd "$ROOT/contracts" && forge test --no-match-path 'lib/**' 2>&1 | grep -oE "[0-9]+ tests? passed" | tail -1 || echo "?")
+      ok "forge test: $passed"
+    else bad "forge test failed"; failed=$((failed+1)); fi
+
+    info "[4/5] bridges: npm test"
+    if (cd "$ROOT/bridges" && [ -d node_modules ] || npm install --silent 2>&1 | tail -1 >/dev/null; npm test 2>&1 | grep -qE "^# pass [0-9]+|^ℹ pass [0-9]+"); then ok "bridges npm test passed"
+    else bad "bridges npm test failed"; failed=$((failed+1)); fi
+
+    info "[5/5] demos: syntax + validate-fixture"
+    if (cd "$ROOT/demos" && [ -d node_modules ] || npm install --silent 2>&1 | tail -1 >/dev/null; \
+        node --check escrow-lifecycle.mjs && \
+        node --check realmoney-loop.mjs && \
+        node --check verify-receipt.mjs && \
+        node --check validate-fixture.mjs && \
+        bash -n audit-with-cast.sh && \
+        node validate-fixture.mjs >/dev/null 2>&1); then ok "demos syntax + fixture clean"
+    else bad "demos syntax or fixture failed"; failed=$((failed+1)); fi
+
+    echo
+    if [ $failed -eq 0 ]; then
+      ok "all 5 non-chain gates pass — your push should land green"
+      info "(e2e demos with anvil still need to run on the runner; '$0 test' covers them locally)"
+    else
+      bad "$failed gate(s) failed — fix locally before pushing"
+      exit 1
+    fi
     ;;
 
   doctor)

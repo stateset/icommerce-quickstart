@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+- **`stateset gates`** — runs the 5 non-chain CI gates locally in sequence: `forge fmt --check`, `forge build --sizes`, `forge test`, bridges `npm test`, demos syntax + `validate-fixture`. Mirrors the CI workflow exactly minus the e2e+chain steps (which `stateset test` covers if anvil is up). Run before `git push` to catch failures locally instead of waiting for the 5-minute CI round-trip. Verified 5/5 green on first run after iter-26.
+
 ## [0.6.0] — 2026-05-07
 
 The "multi-process e2e is now strict" release. v0.5.0 added two `realmoney-loop` runs to CI; v0.6.0 makes them assert protocol invariants at every phase boundary, not just "no tx reverted".
