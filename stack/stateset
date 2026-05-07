@@ -45,6 +45,7 @@ ${B}stateset${X} — local-stack orchestrator
   ${C}bridges:stop${X}      stop them
   ${C}demo <name>${X}       lifecycle | realmoney | verify
   ${C}audit [path]${X}      verify-receipt against a path (default: bundled fixture)
+  ${C}receipts${X}          list every receipt JSON in the repo (schema + size + date)
 
   ${C}test${X}              contracts + bridges + demos
   ${C}gates${X}             run every non-chain CI gate locally (preview a push)
@@ -138,6 +139,30 @@ case "${1:-}" in
     cd "$ROOT/demos"
     [ -d node_modules ] || npm install --silent
     exec node verify-receipt.mjs "$target"
+    ;;
+
+  receipts)
+    # List every JSON receipt in the repo with its schema discriminator,
+    # size, and mtime. Pairs with `stateset audit <path>`. Only looks in
+    # places real receipts live — never in node_modules / lib / cache.
+    echo -e "${B}Receipts in $ROOT${X}"
+    found=0
+    # Search roots: demos/fixtures (bundled), repo root + ves-demo-style
+    # patterns at any depth EXCEPT node_modules + contracts/lib + caches.
+    while IFS= read -r f; do
+      [ -f "$f" ] || continue
+      # Filter to *receipt-shaped* JSONs (have a stateset.* schema field)
+      schema=$(python3 -c "import json,sys;d=json.load(open(sys.argv[1]));s=d.get('schema','');print(s if s.startswith('stateset.') else '')" "$f" 2>/dev/null)
+      [ -z "$schema" ] && continue
+      size=$(stat -c%s "$f" 2>/dev/null || stat -f%z "$f" 2>/dev/null || echo '?')
+      mtime=$(stat -c%y "$f" 2>/dev/null | cut -d. -f1 || stat -f%Sm -t '%Y-%m-%d %H:%M' "$f" 2>/dev/null || echo '?')
+      relpath=${f#$ROOT/}
+      printf "  ${C}%-50s${X} ${D}%s${X}  %s  ${D}%sB${X}\n" "$relpath" "$mtime" "$schema" "$size"
+      found=$((found+1))
+    done < <(find "$ROOT" \
+      \( -path '*/node_modules' -o -path '*/lib' -o -path '*/cache' -o -path '*/out' -o -path '*/broadcast' \) -prune \
+      -o -name '*.json' -print 2>/dev/null)
+    [ $found -eq 0 ] && warn "no receipt-shaped JSONs found (need 'schema' field starting with 'stateset.')"
     ;;
 
   show)
