@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
-## [0.2.0] — 2026-05-06
+## [0.2.0] — 2026-05-07
 
 The "demos genuinely run in CI" release. Closes every iter-7 self-grade item that didn't require a clean VM.
 
