@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file. Format foll
 ## [Unreleased]
 
 ### Added
-- `scripts/install-hooks.sh` — installs a git `pre-commit` hook that runs `forge fmt --check` on staged Solidity files, `node --check` on staged JS files, and `bash -n` on staged shell files. Catches formatting/syntax issues locally before push, instead of after a 5-minute CI round-trip. Bypass per-commit with `git commit --no-verify`. Documented in CONTRIBUTING.md as recommended.
+- **`realmoney-loop` (USD) now runs in e2e CI** — second e2e step in the demos job, after `escrow-lifecycle`. Spawns both bridges as child processes, runs the full Stripe-webhook → SSDC mint → OrderEscrow → SSDC pull → Stripe Treasury cycle, fails CI if any phase reverts. Multi-currency variants (`--currency JPY --payout-currency GBP`) are still local-only — future iter once timing/reliability is established.
 
 ## [0.4.0] — 2026-05-07
 
@@ -14,6 +14,7 @@ The "every commerce contract under test" release. Test count more than doubled (
 ### Added
 - `contracts/test/SetPaymaster.t.sol` (48 tests) — x402 batch settlement primitives, signature aggregation, paymaster role gating, pause/upgrade authorization, gas-sponsorship paths.
 - `contracts/test/SetPaymentBatch.t.sol` (75 tests) — settlement nonce uniqueness, Merkle inclusion proofs, transfer-returns-false handling, batch lifecycle, asset configuration, upgrade authorization.
+- `scripts/install-hooks.sh` — opt-in git `pre-commit` hook running `forge fmt --check` on staged Solidity, `node --check` on JS, `bash -n` on shell. Catches issues locally before push (no 5-minute CI round-trip). Documented in CONTRIBUTING.md as recommended.
 - README "Releases" table — visible cadence, links to each tag.
 
 ### Coverage matrix
