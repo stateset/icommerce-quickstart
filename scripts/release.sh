@@ -116,14 +116,26 @@ fi
 
 # Notes
 if [ -n "$NOTES_INLINE" ]; then
-  # Reject obvious placeholder text — easy mistake to make and very ugly to recover from.
-  for placeholder in "test" "todo" "TBD" "tbd" "fixme" "FIXME" "draft" "DRAFT" "dry-run" "wip" "WIP"; do
-    if echo "$NOTES_INLINE" | grep -qiE "(^|\s)${placeholder}(\s|$)" || \
-       [ "$(echo "$NOTES_INLINE" | wc -w)" -lt 3 ]; then
-      bad "release notes look placeholder/short ('$NOTES_INLINE'). Pass real notes, or --dry-run to test."
+  # Reject obviously-placeholder notes. The original iter-11 check used a
+  # word-boundary grep over the full text, which falsely flagged legitimate
+  # notes that happened to mention "test" / "wip" anywhere (e.g. "node --test"
+  # in usage instructions). Replace with a sanity check on the FIRST LINE
+  # only — that's where a placeholder ("test", "wip release", "tbd") would
+  # actually live in real misuse.
+  word_count=$(echo "$NOTES_INLINE" | wc -w)
+  first_line=$(echo "$NOTES_INLINE" | head -1 | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+  if [ "$word_count" -lt 3 ]; then
+    bad "release notes too short (<3 words). Pass real notes, or --dry-run to test."
+    exit 1
+  fi
+  case "$first_line" in
+    test|todo|tbd|fixme|draft|dryrun|dry-run|wip|placeholder|xxx)
+      bad "release notes' first line is just '$first_line' — looks placeholder."
+      info "Pass real notes (a 1-line summary on the first line, then a body)."
+      info "Or use --dry-run to test the preflight without tagging."
       exit 1
-    fi
-  done
+      ;;
+  esac
   NOTES="$NOTES_INLINE"
 else
   TMP=$(mktemp)
