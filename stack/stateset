@@ -47,6 +47,8 @@ ${B}stateset${X} — local-stack orchestrator
   ${C}test${X}              contracts + bridges + demos
   ${C}gates${X}             run every non-chain CI gate locally (preview a push)
   ${C}bench${X}             forge gas reports for the deployed contracts
+  ${C}bench:snapshot${X}    regenerate contracts/.gas-snapshot (commit to record)
+  ${C}bench:diff${X}        diff current gas usage against committed snapshot
   ${C}doctor${X} [--fix]    health check; --fix auto-remediates
   ${C}version${X}           print versions of forge, node, cast, this CLI
   ${C}clean${X}             remove cache/, out/, broadcast/, node_modules/, run/
@@ -256,6 +258,26 @@ case "${1:-}" in
     info "running forge test --gas-report (this is slower than 'test')…"
     (cd "$ROOT/contracts" && forge test --gas-report --no-match-path 'lib/**' 2>&1 | grep -E "^\| (src/|contracts/|test/|│ )" | head -120 || true)
     ok "bench complete (above tables are gas usage per function call)"
+    ;;
+
+  bench:snapshot|bench-snapshot)
+    # Regenerate contracts/.gas-snapshot — commit the result so PR diffs
+    # show per-test gas-usage changes line by line. Run this any time you
+    # tune a contract's gas profile and want the diff to be visible.
+    info "regenerating .gas-snapshot…"
+    (cd "$ROOT/contracts" && forge snapshot --no-match-path 'lib/**' >/dev/null 2>&1) \
+      && ok "snapshot regenerated; commit contracts/.gas-snapshot to record"
+    ;;
+
+  bench:diff|bench-diff)
+    # Diff current gas usage against the committed .gas-snapshot. Reports
+    # tests that got cheaper/more expensive — non-failing, just informational.
+    if [ ! -f "$ROOT/contracts/.gas-snapshot" ]; then
+      bad "no contracts/.gas-snapshot to diff against; run: $0 bench:snapshot"
+      exit 1
+    fi
+    info "diffing gas usage against committed .gas-snapshot…"
+    (cd "$ROOT/contracts" && forge snapshot --diff --no-match-path 'lib/**' 2>&1 | head -40)
     ;;
 
   gates)
