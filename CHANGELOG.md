@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+- **8 invariant assertions in `realmoney-loop`** (parallel to iter-11's escrow-lifecycle work):
+  - **Phase 1**: buyer SSDC balance increased by exactly `ssUsdMinted`. Catches off-by-decimal mints, wrong-receiver mints, fee-skim bugs in the on-ramp.
+  - **Phase 2**: buyer net flow = `-orderTotal`, seller +`orderTotal`, escrow drained. Same invariants as escrow-lifecycle, but here over the multi-process flow.
+  - **Phase 3**: seller -`pulledSsdcWei`, bridge treasury +`pulledSsdcWei`, Stripe Treasury intent currency matches request, status='processing'. Catches FX-conversion bugs, wrong-currency intents, missing pulls.
+- The multi-process e2e CI gate (USD + JPY→GBP) is now strict — fails on wrong balances, not just on reverted txs. Same class of upgrade escrow-lifecycle got at iter-11.
+
 ## [0.5.0] — 2026-05-07
 
 The "multi-currency claim is now a test" release. The v0.4.0 release notes mentioned 5-currency support (USD/EUR/GBP/JPY/MXN) but no test exercised the FX path end-to-end — DeployLocal seeded quotes, but nothing ever read them via the bridges. v0.5.0 closes that gap.

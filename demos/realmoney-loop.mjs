@@ -26,6 +26,7 @@
 
 import { spawn, execFileSync } from 'node:child_process';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { strict as assert } from 'node:assert';
 import http from 'node:http';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -190,7 +191,15 @@ try {
     console.log(`  ${C.green}✓${C.reset} Stripe webhook accepted, ${SYM}${BUYER_AMOUNT.toLocaleString()} ${BUYER_CURRENCY} → ${ssUsdMinted.toFixed(2)} SSDC ${C.dim}(on-chain rate ${fxRate})${C.reset}`);
   }
   console.log(`     ${C.dim}mint tx ${mintTx}${C.reset}`);
-  console.log(`     ${C.dim}buyer balance: ${fmt(await ssdc.balanceOf(buyer.address))} SSDC${C.reset}`);
+
+  // Invariants — same pattern as escrow-lifecycle (iter-11). After Phase 1
+  // the buyer's SSDC balance must have grown by exactly `ssUsdMinted`. If
+  // a contract bug or bridge bug minted the wrong amount (off-by-decimal,
+  // wrong receiver, fee-skim), this catches it.
+  const buyerAfterMint = await ssdc.balanceOf(buyer.address);
+  const minted = parseUnits(ssUsdMinted.toString(), 18);
+  assert.equal(buyerAfterMint - buyerStart, minted, `Phase 1: buyer balance Δ ≠ minted (Δ=${fmt(buyerAfterMint - buyerStart)} vs ${fmt(minted)})`);
+  console.log(`     ${C.green}✓${C.reset} ${C.dim}buyer +${fmt(minted)} SSDC (asserted)${C.reset}`);
 
   // ─── Phase 2: OrderEscrow lifecycle ─────────────────────────────────────
   // Size the on-chain order to ~80% of the just-minted SSDC, so there's
@@ -220,7 +229,16 @@ try {
   await (await escrowAsBuyer.markDelivered(orderId, receiptHash, { gasLimit: 200_000n, nonce: buyerNonce++ })).wait();
   const releaseRcpt = await (await escrowAsSeller.release(orderId, { gasLimit: 300_000n, nonce: sellerNonce++ })).wait();
   console.log(`  ${C.green}✓${C.reset} seller released funds  ${C.dim}tx ${releaseRcpt.hash.slice(0, 16)}…${C.reset}`);
-  console.log(`     ${C.dim}seller balance: ${fmt(await ssdc.balanceOf(seller.address))} SSDC${C.reset}`);
+
+  // Phase 2 invariants: buyer net flow = -orderTotal, seller +orderTotal,
+  // escrow drained. (No fee path in this demo — orderTotal flows clean.)
+  const buyerAfterEscrow  = await ssdc.balanceOf(buyer.address);
+  const sellerAfterEscrow = await ssdc.balanceOf(seller.address);
+  const escrowAfterRelease = await ssdc.balanceOf(escrowAddr);
+  assert.equal(buyerAfterEscrow, buyerAfterMint - orderTotal, `Phase 2: buyer ${fmt(buyerAfterEscrow)} ≠ ${fmt(buyerAfterMint - orderTotal)}`);
+  assert.equal(sellerAfterEscrow - sellerStart, orderTotal, `Phase 2: seller Δ ${fmt(sellerAfterEscrow - sellerStart)} ≠ ${fmt(orderTotal)}`);
+  assert.equal(escrowAfterRelease, 0n, `Phase 2: escrow not drained (holds ${fmt(escrowAfterRelease)})`);
+  console.log(`     ${C.green}✓${C.reset} ${C.dim}buyer −${fmt(orderTotal)}, seller +${fmt(orderTotal)}, escrow drained (asserted)${C.reset}`);
 
   // ─── Phase 3: seller cash-out → Stripe Treasury intent ──────────────────
   console.log(`\n${C.bold}━━━ Phase 3: SSDC → Stripe Treasury → bank ━━━${C.reset}`);
@@ -275,6 +293,18 @@ try {
   }
   console.log(`     ${C.dim}pull tx ${r.pull_tx.slice(0, 16)}…${C.reset}`);
   console.log(`     ${C.dim}Stripe Treasury intent: ${r.payout.id}  ${r.payout.currency.toUpperCase()} ${r.payout.amount}  ETA ${new Date(r.payout.expected_arrival_date * 1000).toISOString().slice(0, 10)}${C.reset}`);
+
+  // Phase 3 invariants: bridge treasury holds the pulled SSDC, seller
+  // balance dropped by exactly the pulled amount, Stripe Treasury intent
+  // shape is correct (currency matches request, status=processing).
+  const pulledSsdcWei = BigInt(r.pull_amount_ssdc_units);
+  const sellerAfterPayout = await ssdc.balanceOf(seller.address);
+  const bridgeAfterPayout = await ssdc.balanceOf(bridgeTreasury);
+  assert.equal(sellerAfterEscrow - sellerAfterPayout, pulledSsdcWei, `Phase 3: seller Δ ${fmt(sellerAfterEscrow - sellerAfterPayout)} ≠ ${fmt(pulledSsdcWei)} pulled`);
+  assert.equal(bridgeAfterPayout, pulledSsdcWei, `Phase 3: bridge balance ${fmt(bridgeAfterPayout)} ≠ ${fmt(pulledSsdcWei)} expected`);
+  assert.equal(r.payout.currency.toUpperCase(), PAYOUT_CURRENCY, `Phase 3: Stripe intent currency ${r.payout.currency} ≠ ${PAYOUT_CURRENCY}`);
+  assert.equal(r.payout.status, 'processing', `Phase 3: Stripe intent status ${r.payout.status} ≠ processing`);
+  console.log(`     ${C.green}✓${C.reset} ${C.dim}seller −${fmt(pulledSsdcWei)} SSDC, bridge +${fmt(pulledSsdcWei)} SSDC, intent ${PAYOUT_CURRENCY}/processing (asserted)${C.reset}`);
 
   // ─── Final summary ──────────────────────────────────────────────────────
   const buyerEnd = await ssdc.balanceOf(buyer.address);
