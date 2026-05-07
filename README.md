@@ -123,15 +123,22 @@ pip install stateset-verify-receipt
 ## Running the tests
 
 ```bash
-./stack/stateset test
+./stack/stateset test            # everything (needs anvil up for e2e)
+./stack/stateset gates           # everything that doesn't need a chain (preview a CI push)
 ```
 
-Runs:
-- **`forge test`** in `contracts/` — Foundry tests for OrderEscrow + FxOracle
-- **`npm test`** in `bridges/` — 35 unit tests covering HMAC, secp256k1 signatures, replay rejection, multi-currency
-- **demo syntax check** — `node --check` on each demo
+CI runs four kinds of tests on every push:
+
+| Layer | What | Count |
+|---|---|---|
+| **`forge test`** in `contracts/` | OrderEscrow, FxOracle, NAVOracle, SetRegistry, SetPaymaster, SetPaymentBatch | **216** |
+| **`npm test`** in `bridges/` | HMAC, secp256k1, replay rejection, multi-currency, lazy-load | **35** |
+| **schema validation** (`validate-fixture.mjs`) | bundled fixture against `agent-receipt.v1.schema.json` | **1** |
+| **e2e demos** (`escrow-lifecycle` + `realmoney-loop` USD + JPY→GBP) | full multi-process cycle with **17 invariant assertions** across 3 runs | **3 runs** |
 
 Bridge tests run **standalone with no chain** — they exercise the pure verification functions (signature recovery, message canonicalization, cross-currency replay rejection).
+
+Contract gas usage is tracked in [`contracts/.gas-snapshot`](./contracts/.gas-snapshot); regressions show as line diffs in PRs. Use `stateset bench:diff` locally to preview.
 
 ---
 
