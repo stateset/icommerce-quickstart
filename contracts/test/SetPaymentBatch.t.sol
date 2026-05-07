@@ -10,11 +10,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 contract MockERC20 is ERC20 {
     uint8 private _decimals;
 
-    constructor(
-        string memory name_,
-        string memory symbol_,
-        uint8 decimals_
-    ) ERC20(name_, symbol_) {
+    constructor(string memory name_, string memory symbol_, uint8 decimals_) ERC20(name_, symbol_) {
         _decimals = decimals_;
     }
 
@@ -31,7 +27,7 @@ contract MockERC20 is ERC20 {
 contract MockERC20ReturnsFalse is ERC20 {
     bool public shouldFail;
 
-    constructor() ERC20("FailToken", "FAIL") {}
+    constructor() ERC20("FailToken", "FAIL") { }
 
     function mint(address to, uint256 amount) external {
         _mint(to, amount);
@@ -86,10 +82,7 @@ contract SetPaymentBatchTest is Test {
     );
 
     event BatchSettled(
-        bytes32 indexed batchId,
-        uint32 paymentsSettled,
-        uint256 totalAmount,
-        uint256 gasUsed
+        bytes32 indexed batchId, uint32 paymentsSettled, uint256 totalAmount, uint256 gasUsed
     );
 
     event PaymentSettled(
@@ -102,10 +95,7 @@ contract SetPaymentBatchTest is Test {
     );
 
     event PaymentFailed(
-        bytes32 indexed batchId,
-        bytes32 indexed intentId,
-        address indexed payer,
-        string reason
+        bytes32 indexed batchId, bytes32 indexed intentId, address indexed payer, string reason
     );
 
     event ContractUpgraded(address indexed newImplementation, address indexed authorizer);
@@ -180,27 +170,23 @@ contract SetPaymentBatchTest is Test {
         );
     }
 
-    function _makePaymentArray(
-        SetPaymentBatch.PaymentIntent memory payment
-    ) internal pure returns (SetPaymentBatch.PaymentIntent[] memory) {
+    function _makePaymentArray(SetPaymentBatch.PaymentIntent memory payment)
+        internal
+        pure
+        returns (SetPaymentBatch.PaymentIntent[] memory)
+    {
         SetPaymentBatch.PaymentIntent[] memory payments = new SetPaymentBatch.PaymentIntent[](1);
         payments[0] = payment;
         return payments;
     }
 
-    function _settleSinglePayment(
-        bytes32 batchId,
-        SetPaymentBatch.PaymentIntent memory payment
-    ) internal {
+    function _settleSinglePayment(bytes32 batchId, SetPaymentBatch.PaymentIntent memory payment)
+        internal
+    {
         SetPaymentBatch.PaymentIntent[] memory payments = _makePaymentArray(payment);
         vm.prank(sequencer);
         paymentBatch.settleBatch(
-            batchId,
-            keccak256("merkle_root"),
-            keccak256("tenant_store"),
-            1,
-            1,
-            payments
+            batchId, keccak256("merkle_root"), keccak256("tenant_store"), 1, 1, payments
         );
     }
 
@@ -225,9 +211,7 @@ contract SetPaymentBatchTest is Test {
         assertEq(usdcConfig.dailyLimit, 1e14);
         assertEq(usdcConfig.dailyVolume, 0);
 
-        SetPaymentBatch.AssetConfig memory ssUsdConfig = paymentBatch.getAssetConfig(
-            address(ssUsd)
-        );
+        SetPaymentBatch.AssetConfig memory ssUsdConfig = paymentBatch.getAssetConfig(address(ssUsd));
         assertTrue(ssUsdConfig.enabled);
         assertEq(ssUsdConfig.minAmount, 1e4);
         assertEq(ssUsdConfig.maxAmount, 1e12);
@@ -250,8 +234,7 @@ contract SetPaymentBatchTest is Test {
     function test_Initialize_WithZeroTokens() public {
         SetPaymentBatch impl = new SetPaymentBatch();
         bytes memory initData = abi.encodeCall(
-            SetPaymentBatch.initialize,
-            (owner, sequencer, address(0), address(0), registryAddr)
+            SetPaymentBatch.initialize, (owner, sequencer, address(0), address(0), registryAddr)
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         SetPaymentBatch pb = SetPaymentBatch(address(proxy));
@@ -360,9 +343,7 @@ contract SetPaymentBatchTest is Test {
         SetPaymentBatch.PaymentIntent memory payment = _makeDefaultPayment();
         _settleSinglePayment(keccak256("batch1"), payment);
 
-        SetPaymentBatch.AssetConfig memory configBefore = paymentBatch.getAssetConfig(
-            address(usdc)
-        );
+        SetPaymentBatch.AssetConfig memory configBefore = paymentBatch.getAssetConfig(address(usdc));
         uint256 volumeBefore = configBefore.dailyVolume;
         assertGt(volumeBefore, 0);
 
@@ -371,9 +352,7 @@ contract SetPaymentBatchTest is Test {
         paymentBatch.configureAsset(address(usdc), true, 1e3, 1e13, 1e15);
 
         // Volume should be preserved
-        SetPaymentBatch.AssetConfig memory configAfter = paymentBatch.getAssetConfig(
-            address(usdc)
-        );
+        SetPaymentBatch.AssetConfig memory configAfter = paymentBatch.getAssetConfig(address(usdc));
         assertEq(configAfter.dailyVolume, volumeBefore);
     }
 
@@ -427,35 +406,22 @@ contract SetPaymentBatchTest is Test {
     }
 
     function test_SettleBatch_NotSequencer() public {
-        SetPaymentBatch.PaymentIntent[] memory payments = _makePaymentArray(
-            _makeDefaultPayment()
-        );
+        SetPaymentBatch.PaymentIntent[] memory payments = _makePaymentArray(_makeDefaultPayment());
 
         vm.prank(unauthorized);
         vm.expectRevert(SetPaymentBatch.NotAuthorizedSequencer.selector);
         paymentBatch.settleBatch(
-            keccak256("batch1"),
-            keccak256("root"),
-            keccak256("tenant"),
-            1,
-            1,
-            payments
+            keccak256("batch1"), keccak256("root"), keccak256("tenant"), 1, 1, payments
         );
     }
 
     function test_SettleBatch_EmptyBatch() public {
-        SetPaymentBatch.PaymentIntent[] memory payments =
-            new SetPaymentBatch.PaymentIntent[](0);
+        SetPaymentBatch.PaymentIntent[] memory payments = new SetPaymentBatch.PaymentIntent[](0);
 
         vm.prank(sequencer);
         vm.expectRevert(SetPaymentBatch.EmptyBatch.selector);
         paymentBatch.settleBatch(
-            keccak256("batch1"),
-            keccak256("root"),
-            keccak256("tenant"),
-            1,
-            1,
-            payments
+            keccak256("batch1"), keccak256("root"), keccak256("tenant"), 1, 1, payments
         );
     }
 
@@ -479,20 +445,11 @@ contract SetPaymentBatchTest is Test {
 
         vm.prank(sequencer);
         vm.expectRevert(SetPaymentBatch.BatchAlreadySettled.selector);
-        paymentBatch.settleBatch(
-            batchId,
-            keccak256("root2"),
-            keccak256("tenant"),
-            2,
-            2,
-            payments
-        );
+        paymentBatch.settleBatch(batchId, keccak256("root2"), keccak256("tenant"), 2, 2, payments);
     }
 
     function test_SettleBatch_InvalidMerkleRoot() public {
-        SetPaymentBatch.PaymentIntent[] memory payments = _makePaymentArray(
-            _makeDefaultPayment()
-        );
+        SetPaymentBatch.PaymentIntent[] memory payments = _makePaymentArray(_makeDefaultPayment());
 
         vm.prank(sequencer);
         vm.expectRevert(SetPaymentBatch.InvalidMerkleRoot.selector);
@@ -510,19 +467,12 @@ contract SetPaymentBatchTest is Test {
         vm.prank(owner);
         paymentBatch.pause();
 
-        SetPaymentBatch.PaymentIntent[] memory payments = _makePaymentArray(
-            _makeDefaultPayment()
-        );
+        SetPaymentBatch.PaymentIntent[] memory payments = _makePaymentArray(_makeDefaultPayment());
 
         vm.prank(sequencer);
         vm.expectRevert();
         paymentBatch.settleBatch(
-            keccak256("batch1"),
-            keccak256("root"),
-            keccak256("tenant"),
-            1,
-            1,
-            payments
+            keccak256("batch1"), keccak256("root"), keccak256("tenant"), 1, 1, payments
         );
     }
 
@@ -534,28 +484,14 @@ contract SetPaymentBatchTest is Test {
 
         // Expect PaymentSettled event
         vm.expectEmit(true, true, true, true);
-        emit PaymentSettled(
-            batchId,
-            payment.intentId,
-            payer1,
-            payee1,
-            100e6,
-            address(usdc)
-        );
+        emit PaymentSettled(batchId, payment.intentId, payer1, payee1, 100e6, address(usdc));
 
         // Expect BatchSubmitted event
         vm.expectEmit(true, false, false, true);
         emit BatchSubmitted(batchId, merkleRoot, 1, 100e6, address(usdc));
 
         vm.prank(sequencer);
-        paymentBatch.settleBatch(
-            batchId,
-            merkleRoot,
-            keccak256("tenant"),
-            1,
-            1,
-            payments
-        );
+        paymentBatch.settleBatch(batchId, merkleRoot, keccak256("tenant"), 1, 1, payments);
     }
 
     // =========================================================================
@@ -581,14 +517,7 @@ contract SetPaymentBatchTest is Test {
         vm.prank(sequencer);
         vm.expectEmit(true, true, true, true);
         emit PaymentFailed(batchId, payment.intentId, payer1, "Payment expired");
-        paymentBatch.settleBatch(
-            batchId,
-            keccak256("root"),
-            keccak256("tenant"),
-            1,
-            1,
-            payments
-        );
+        paymentBatch.settleBatch(batchId, keccak256("root"), keccak256("tenant"), 1, 1, payments);
 
         // Batch was created but with 0 successful payments
         SetPaymentBatch.BatchSettlement memory batch = paymentBatch.getBatch(batchId);
@@ -602,15 +531,13 @@ contract SetPaymentBatchTest is Test {
 
         // Settle first time
         SetPaymentBatch.PaymentIntent memory payment1 = _makePayment(
-            intentId, payer1, payee1, 100e6, address(usdc), 1,
-            uint64(block.timestamp + 1 hours)
+            intentId, payer1, payee1, 100e6, address(usdc), 1, uint64(block.timestamp + 1 hours)
         );
         _settleSinglePayment(keccak256("batch1"), payment1);
 
         // Try to settle same intentId in a different batch
         SetPaymentBatch.PaymentIntent memory payment2 = _makePayment(
-            intentId, payer1, payee1, 100e6, address(usdc), 2,
-            uint64(block.timestamp + 1 hours)
+            intentId, payer1, payee1, 100e6, address(usdc), 2, uint64(block.timestamp + 1 hours)
         );
         bytes32 batchId2 = keccak256("batch2");
         SetPaymentBatch.PaymentIntent[] memory payments = _makePaymentArray(payment2);
@@ -618,14 +545,7 @@ contract SetPaymentBatchTest is Test {
         vm.prank(sequencer);
         vm.expectEmit(true, true, true, true);
         emit PaymentFailed(batchId2, intentId, payer1, "Already settled");
-        paymentBatch.settleBatch(
-            batchId2,
-            keccak256("root2"),
-            keccak256("tenant"),
-            2,
-            2,
-            payments
-        );
+        paymentBatch.settleBatch(batchId2, keccak256("root2"), keccak256("tenant"), 2, 2, payments);
 
         SetPaymentBatch.BatchSettlement memory batch = paymentBatch.getBatch(batchId2);
         assertEq(batch.paymentCount, 0);
@@ -636,14 +556,24 @@ contract SetPaymentBatchTest is Test {
 
         // Settle first payment with nonce
         SetPaymentBatch.PaymentIntent memory payment1 = _makePayment(
-            keccak256("intent1"), payer1, payee1, 100e6, address(usdc), nonce,
+            keccak256("intent1"),
+            payer1,
+            payee1,
+            100e6,
+            address(usdc),
+            nonce,
             uint64(block.timestamp + 1 hours)
         );
         _settleSinglePayment(keccak256("batch1"), payment1);
 
         // Try to use same nonce for same payer
         SetPaymentBatch.PaymentIntent memory payment2 = _makePayment(
-            keccak256("intent2"), payer1, payee2, 50e6, address(usdc), nonce,
+            keccak256("intent2"),
+            payer1,
+            payee2,
+            50e6,
+            address(usdc),
+            nonce,
             uint64(block.timestamp + 1 hours)
         );
         bytes32 batchId2 = keccak256("batch2");
@@ -652,19 +582,17 @@ contract SetPaymentBatchTest is Test {
         vm.prank(sequencer);
         vm.expectEmit(true, true, true, true);
         emit PaymentFailed(batchId2, keccak256("intent2"), payer1, "Nonce already used");
-        paymentBatch.settleBatch(
-            batchId2,
-            keccak256("root2"),
-            keccak256("tenant"),
-            2,
-            2,
-            payments
-        );
+        paymentBatch.settleBatch(batchId2, keccak256("root2"), keccak256("tenant"), 2, 2, payments);
     }
 
     function test_Settlement_AssetNotEnabled() public {
         SetPaymentBatch.PaymentIntent memory payment = _makePayment(
-            keccak256("intent1"), payer1, payee1, 100e6, address(usdt), 1,
+            keccak256("intent1"),
+            payer1,
+            payee1,
+            100e6,
+            address(usdt),
+            1,
             uint64(block.timestamp + 1 hours)
         );
         bytes32 batchId = keccak256("batch1");
@@ -673,20 +601,18 @@ contract SetPaymentBatchTest is Test {
         vm.prank(sequencer);
         vm.expectEmit(true, true, true, true);
         emit PaymentFailed(batchId, payment.intentId, payer1, "Asset not enabled");
-        paymentBatch.settleBatch(
-            batchId,
-            keccak256("root"),
-            keccak256("tenant"),
-            1,
-            1,
-            payments
-        );
+        paymentBatch.settleBatch(batchId, keccak256("root"), keccak256("tenant"), 1, 1, payments);
     }
 
     function test_Settlement_AmountBelowMinimum() public {
         // Default min is 1e4 (0.01 USDC)
         SetPaymentBatch.PaymentIntent memory payment = _makePayment(
-            keccak256("intent1"), payer1, payee1, 1e3, address(usdc), 1,
+            keccak256("intent1"),
+            payer1,
+            payee1,
+            1e3,
+            address(usdc),
+            1,
             uint64(block.timestamp + 1 hours)
         );
         bytes32 batchId = keccak256("batch1");
@@ -695,14 +621,7 @@ contract SetPaymentBatchTest is Test {
         vm.prank(sequencer);
         vm.expectEmit(true, true, true, true);
         emit PaymentFailed(batchId, payment.intentId, payer1, "Amount below minimum");
-        paymentBatch.settleBatch(
-            batchId,
-            keccak256("root"),
-            keccak256("tenant"),
-            1,
-            1,
-            payments
-        );
+        paymentBatch.settleBatch(batchId, keccak256("root"), keccak256("tenant"), 1, 1, payments);
     }
 
     function test_Settlement_AmountAboveMaximum() public {
@@ -711,7 +630,12 @@ contract SetPaymentBatchTest is Test {
         usdc.mint(payer1, overMax); // make sure payer has enough
 
         SetPaymentBatch.PaymentIntent memory payment = _makePayment(
-            keccak256("intent1"), payer1, payee1, overMax, address(usdc), 1,
+            keccak256("intent1"),
+            payer1,
+            payee1,
+            overMax,
+            address(usdc),
+            1,
             uint64(block.timestamp + 1 hours)
         );
         bytes32 batchId = keccak256("batch1");
@@ -720,14 +644,7 @@ contract SetPaymentBatchTest is Test {
         vm.prank(sequencer);
         vm.expectEmit(true, true, true, true);
         emit PaymentFailed(batchId, payment.intentId, payer1, "Amount above maximum");
-        paymentBatch.settleBatch(
-            batchId,
-            keccak256("root"),
-            keccak256("tenant"),
-            1,
-            1,
-            payments
-        );
+        paymentBatch.settleBatch(batchId, keccak256("root"), keccak256("tenant"), 1, 1, payments);
     }
 
     function test_Settlement_InsufficientBalance() public {
@@ -737,7 +654,12 @@ contract SetPaymentBatchTest is Test {
         usdc.approve(address(paymentBatch), type(uint256).max);
 
         SetPaymentBatch.PaymentIntent memory payment = _makePayment(
-            keccak256("intent1"), poorPayer, payee1, 100e6, address(usdc), 1,
+            keccak256("intent1"),
+            poorPayer,
+            payee1,
+            100e6,
+            address(usdc),
+            1,
             uint64(block.timestamp + 1 hours)
         );
         bytes32 batchId = keccak256("batch1");
@@ -746,14 +668,7 @@ contract SetPaymentBatchTest is Test {
         vm.prank(sequencer);
         vm.expectEmit(true, true, true, true);
         emit PaymentFailed(batchId, payment.intentId, poorPayer, "Insufficient balance");
-        paymentBatch.settleBatch(
-            batchId,
-            keccak256("root"),
-            keccak256("tenant"),
-            1,
-            1,
-            payments
-        );
+        paymentBatch.settleBatch(batchId, keccak256("root"), keccak256("tenant"), 1, 1, payments);
     }
 
     function test_Settlement_InsufficientAllowance() public {
@@ -762,7 +677,12 @@ contract SetPaymentBatchTest is Test {
         // No approval given
 
         SetPaymentBatch.PaymentIntent memory payment = _makePayment(
-            keccak256("intent1"), noApprovalPayer, payee1, 100e6, address(usdc), 1,
+            keccak256("intent1"),
+            noApprovalPayer,
+            payee1,
+            100e6,
+            address(usdc),
+            1,
             uint64(block.timestamp + 1 hours)
         );
         bytes32 batchId = keccak256("batch1");
@@ -770,20 +690,8 @@ contract SetPaymentBatchTest is Test {
 
         vm.prank(sequencer);
         vm.expectEmit(true, true, true, true);
-        emit PaymentFailed(
-            batchId,
-            payment.intentId,
-            noApprovalPayer,
-            "Insufficient allowance"
-        );
-        paymentBatch.settleBatch(
-            batchId,
-            keccak256("root"),
-            keccak256("tenant"),
-            1,
-            1,
-            payments
-        );
+        emit PaymentFailed(batchId, payment.intentId, noApprovalPayer, "Insufficient allowance");
+        paymentBatch.settleBatch(batchId, keccak256("root"), keccak256("tenant"), 1, 1, payments);
     }
 
     function test_Settlement_TransferReturnsFalse() public {
@@ -801,7 +709,12 @@ contract SetPaymentBatchTest is Test {
         failToken.setShouldFail(true);
 
         SetPaymentBatch.PaymentIntent memory payment = _makePayment(
-            keccak256("intent1"), payer1, payee1, 100e6, address(failToken), 1,
+            keccak256("intent1"),
+            payer1,
+            payee1,
+            100e6,
+            address(failToken),
+            1,
             uint64(block.timestamp + 1 hours)
         );
         bytes32 batchId = keccak256("batch1");
@@ -810,14 +723,7 @@ contract SetPaymentBatchTest is Test {
         vm.prank(sequencer);
         vm.expectEmit(true, true, true, true);
         emit PaymentFailed(batchId, payment.intentId, payer1, "Transfer failed");
-        paymentBatch.settleBatch(
-            batchId,
-            keccak256("root"),
-            keccak256("tenant"),
-            1,
-            1,
-            payments
-        );
+        paymentBatch.settleBatch(batchId, keccak256("root"), keccak256("tenant"), 1, 1, payments);
     }
 
     function test_Settlement_MarksIntentAndNonce() public {
@@ -825,8 +731,7 @@ contract SetPaymentBatchTest is Test {
         uint64 nonce = 7;
 
         SetPaymentBatch.PaymentIntent memory payment = _makePayment(
-            intentId, payer1, payee1, 100e6, address(usdc), nonce,
-            uint64(block.timestamp + 1 hours)
+            intentId, payer1, payee1, 100e6, address(usdc), nonce, uint64(block.timestamp + 1 hours)
         );
 
         assertFalse(paymentBatch.isIntentSettled(intentId));
@@ -849,14 +754,24 @@ contract SetPaymentBatchTest is Test {
 
         // Settle 150 USDC
         SetPaymentBatch.PaymentIntent memory payment1 = _makePayment(
-            keccak256("intent1"), payer1, payee1, 150e6, address(usdc), 1,
+            keccak256("intent1"),
+            payer1,
+            payee1,
+            150e6,
+            address(usdc),
+            1,
             uint64(block.timestamp + 1 hours)
         );
         _settleSinglePayment(keccak256("batch1"), payment1);
 
         // Try to settle 60 USDC (would exceed 200 limit)
         SetPaymentBatch.PaymentIntent memory payment2 = _makePayment(
-            keccak256("intent2"), payer1, payee1, 60e6, address(usdc), 2,
+            keccak256("intent2"),
+            payer1,
+            payee1,
+            60e6,
+            address(usdc),
+            2,
             uint64(block.timestamp + 1 hours)
         );
         bytes32 batchId2 = keccak256("batch2");
@@ -865,14 +780,7 @@ contract SetPaymentBatchTest is Test {
         vm.prank(sequencer);
         vm.expectEmit(true, true, true, true);
         emit PaymentFailed(batchId2, keccak256("intent2"), payer1, "Daily limit exceeded");
-        paymentBatch.settleBatch(
-            batchId2,
-            keccak256("root2"),
-            keccak256("tenant"),
-            2,
-            2,
-            payments
-        );
+        paymentBatch.settleBatch(batchId2, keccak256("root2"), keccak256("tenant"), 2, 2, payments);
     }
 
     function test_DailyLimit_ResetsAfterOneDay() public {
@@ -882,7 +790,12 @@ contract SetPaymentBatchTest is Test {
 
         // Settle 150 USDC
         SetPaymentBatch.PaymentIntent memory payment1 = _makePayment(
-            keccak256("intent1"), payer1, payee1, 150e6, address(usdc), 1,
+            keccak256("intent1"),
+            payer1,
+            payee1,
+            150e6,
+            address(usdc),
+            1,
             uint64(block.timestamp + 1 hours)
         );
         _settleSinglePayment(keccak256("batch1"), payment1);
@@ -892,7 +805,12 @@ contract SetPaymentBatchTest is Test {
 
         // Should now be able to settle 150 again (daily volume reset)
         SetPaymentBatch.PaymentIntent memory payment2 = _makePayment(
-            keccak256("intent2"), payer1, payee1, 150e6, address(usdc), 2,
+            keccak256("intent2"),
+            payer1,
+            payee1,
+            150e6,
+            address(usdc),
+            2,
             uint64(block.timestamp + 1 hours)
         );
         _settleSinglePayment(keccak256("batch2"), payment2);
@@ -908,7 +826,12 @@ contract SetPaymentBatchTest is Test {
 
         // Settle exactly the daily limit
         SetPaymentBatch.PaymentIntent memory payment = _makePayment(
-            keccak256("intent1"), payer1, payee1, 100e6, address(usdc), 1,
+            keccak256("intent1"),
+            payer1,
+            payee1,
+            100e6,
+            address(usdc),
+            1,
             uint64(block.timestamp + 1 hours)
         );
         _settleSinglePayment(keccak256("batch1"), payment);
@@ -922,19 +845,33 @@ contract SetPaymentBatchTest is Test {
     // =========================================================================
 
     function test_SettleBatch_MultiplePayments() public {
-        SetPaymentBatch.PaymentIntent[] memory payments =
-            new SetPaymentBatch.PaymentIntent[](3);
+        SetPaymentBatch.PaymentIntent[] memory payments = new SetPaymentBatch.PaymentIntent[](3);
 
         payments[0] = _makePayment(
-            keccak256("intent1"), payer1, payee1, 100e6, address(usdc), 1,
+            keccak256("intent1"),
+            payer1,
+            payee1,
+            100e6,
+            address(usdc),
+            1,
             uint64(block.timestamp + 1 hours)
         );
         payments[1] = _makePayment(
-            keccak256("intent2"), payer2, payee2, 200e6, address(usdc), 1,
+            keccak256("intent2"),
+            payer2,
+            payee2,
+            200e6,
+            address(usdc),
+            1,
             uint64(block.timestamp + 1 hours)
         );
         payments[2] = _makePayment(
-            keccak256("intent3"), payer1, payee2, 50e6, address(usdc), 2,
+            keccak256("intent3"),
+            payer1,
+            payee2,
+            50e6,
+            address(usdc),
+            2,
             uint64(block.timestamp + 1 hours)
         );
 
@@ -946,14 +883,7 @@ contract SetPaymentBatchTest is Test {
         uint256 payee2Before = usdc.balanceOf(payee2);
 
         vm.prank(sequencer);
-        paymentBatch.settleBatch(
-            batchId,
-            keccak256("root"),
-            keccak256("tenant"),
-            1,
-            3,
-            payments
-        );
+        paymentBatch.settleBatch(batchId, keccak256("root"), keccak256("tenant"), 1, 3, payments);
 
         // Verify balances
         assertEq(usdc.balanceOf(payer1), payer1Before - 150e6); // 100 + 50
@@ -971,29 +901,31 @@ contract SetPaymentBatchTest is Test {
 
     function test_SettleBatch_PartialSuccess() public {
         // Two payments: one valid, one expired
-        SetPaymentBatch.PaymentIntent[] memory payments =
-            new SetPaymentBatch.PaymentIntent[](2);
+        SetPaymentBatch.PaymentIntent[] memory payments = new SetPaymentBatch.PaymentIntent[](2);
 
         payments[0] = _makePayment(
-            keccak256("good_intent"), payer1, payee1, 100e6, address(usdc), 1,
+            keccak256("good_intent"),
+            payer1,
+            payee1,
+            100e6,
+            address(usdc),
+            1,
             uint64(block.timestamp + 1 hours)
         );
         payments[1] = _makePayment(
-            keccak256("bad_intent"), payer1, payee2, 50e6, address(usdc), 2,
+            keccak256("bad_intent"),
+            payer1,
+            payee2,
+            50e6,
+            address(usdc),
+            2,
             uint64(block.timestamp - 1) // expired
         );
 
         bytes32 batchId = keccak256("batch_partial");
 
         vm.prank(sequencer);
-        paymentBatch.settleBatch(
-            batchId,
-            keccak256("root"),
-            keccak256("tenant"),
-            1,
-            2,
-            payments
-        );
+        paymentBatch.settleBatch(batchId, keccak256("root"), keccak256("tenant"), 1, 2, payments);
 
         SetPaymentBatch.BatchSettlement memory batch = paymentBatch.getBatch(batchId);
         assertEq(batch.paymentCount, 1); // only 1 succeeded
@@ -1002,29 +934,19 @@ contract SetPaymentBatchTest is Test {
 
     function test_SettleBatch_AllFail() public {
         // All payments expired
-        SetPaymentBatch.PaymentIntent[] memory payments =
-            new SetPaymentBatch.PaymentIntent[](2);
+        SetPaymentBatch.PaymentIntent[] memory payments = new SetPaymentBatch.PaymentIntent[](2);
 
         payments[0] = _makePayment(
-            keccak256("bad1"), payer1, payee1, 100e6, address(usdc), 1,
-            uint64(block.timestamp - 1)
+            keccak256("bad1"), payer1, payee1, 100e6, address(usdc), 1, uint64(block.timestamp - 1)
         );
         payments[1] = _makePayment(
-            keccak256("bad2"), payer1, payee2, 50e6, address(usdc), 2,
-            uint64(block.timestamp - 1)
+            keccak256("bad2"), payer1, payee2, 50e6, address(usdc), 2, uint64(block.timestamp - 1)
         );
 
         bytes32 batchId = keccak256("batch_allfail");
 
         vm.prank(sequencer);
-        paymentBatch.settleBatch(
-            batchId,
-            keccak256("root"),
-            keccak256("tenant"),
-            1,
-            2,
-            payments
-        );
+        paymentBatch.settleBatch(batchId, keccak256("root"), keccak256("tenant"), 1, 2, payments);
 
         SetPaymentBatch.BatchSettlement memory batch = paymentBatch.getBatch(batchId);
         assertGt(batch.settledAt, 0);
@@ -1034,7 +956,12 @@ contract SetPaymentBatchTest is Test {
 
     function test_SettleBatch_WithSsUsdToken() public {
         SetPaymentBatch.PaymentIntent memory payment = _makePayment(
-            keccak256("intent_ssusd"), payer1, payee1, 100e6, address(ssUsd), 1,
+            keccak256("intent_ssusd"),
+            payer1,
+            payee1,
+            100e6,
+            address(ssUsd),
+            1,
             uint64(block.timestamp + 1 hours)
         );
 
@@ -1050,18 +977,27 @@ contract SetPaymentBatchTest is Test {
     function test_SettleBatch_MultipleBatchesSequentially() public {
         // Settle batch 1
         SetPaymentBatch.PaymentIntent memory payment1 = _makePayment(
-            keccak256("intent1"), payer1, payee1, 100e6, address(usdc), 1,
+            keccak256("intent1"),
+            payer1,
+            payee1,
+            100e6,
+            address(usdc),
+            1,
             uint64(block.timestamp + 1 hours)
         );
         _settleSinglePayment(keccak256("batch1"), payment1);
 
         // Settle batch 2
         SetPaymentBatch.PaymentIntent memory payment2 = _makePayment(
-            keccak256("intent2"), payer2, payee2, 200e6, address(usdc), 1,
+            keccak256("intent2"),
+            payer2,
+            payee2,
+            200e6,
+            address(usdc),
+            1,
             uint64(block.timestamp + 1 hours)
         );
         _settleSinglePayment(keccak256("batch2"), payment2);
-
     }
 
     // =========================================================================
@@ -1080,8 +1016,7 @@ contract SetPaymentBatchTest is Test {
         assertFalse(paymentBatch.isIntentSettled(intentId));
 
         SetPaymentBatch.PaymentIntent memory payment = _makePayment(
-            intentId, payer1, payee1, 100e6, address(usdc), 1,
-            uint64(block.timestamp + 1 hours)
+            intentId, payer1, payee1, 100e6, address(usdc), 1, uint64(block.timestamp + 1 hours)
         );
         _settleSinglePayment(keccak256("batch1"), payment);
 
@@ -1100,9 +1035,7 @@ contract SetPaymentBatchTest is Test {
     }
 
     function test_GetAssetConfig_Unconfigured() public view {
-        SetPaymentBatch.AssetConfig memory config = paymentBatch.getAssetConfig(
-            address(0xDEAD)
-        );
+        SetPaymentBatch.AssetConfig memory config = paymentBatch.getAssetConfig(address(0xDEAD));
         assertFalse(config.enabled);
         assertEq(config.minAmount, 0);
         assertEq(config.maxAmount, 0);
@@ -1134,20 +1067,12 @@ contract SetPaymentBatchTest is Test {
         // Settle a batch with this Merkle root
         bytes32 batchId = keccak256("batch_merkle");
         SetPaymentBatch.PaymentIntent memory payment = _makePayment(
-            leaf0, payer1, payee1, 100e6, address(usdc), 1,
-            uint64(block.timestamp + 1 hours)
+            leaf0, payer1, payee1, 100e6, address(usdc), 1, uint64(block.timestamp + 1 hours)
         );
         SetPaymentBatch.PaymentIntent[] memory payments = _makePaymentArray(payment);
 
         vm.prank(sequencer);
-        paymentBatch.settleBatch(
-            batchId,
-            merkleRoot,
-            keccak256("tenant"),
-            1,
-            1,
-            payments
-        );
+        paymentBatch.settleBatch(batchId, merkleRoot, keccak256("tenant"), 1, 1, payments);
 
         // Verify leaf0 (index 0)
         bytes32[] memory proof0 = new bytes32[](2);
@@ -1180,20 +1105,12 @@ contract SetPaymentBatchTest is Test {
 
         bytes32 batchId = keccak256("batch_merkle");
         SetPaymentBatch.PaymentIntent memory payment = _makePayment(
-            leaf, payer1, payee1, 100e6, address(usdc), 1,
-            uint64(block.timestamp + 1 hours)
+            leaf, payer1, payee1, 100e6, address(usdc), 1, uint64(block.timestamp + 1 hours)
         );
         SetPaymentBatch.PaymentIntent[] memory payments = _makePaymentArray(payment);
 
         vm.prank(sequencer);
-        paymentBatch.settleBatch(
-            batchId,
-            merkleRoot,
-            keccak256("tenant"),
-            1,
-            1,
-            payments
-        );
+        paymentBatch.settleBatch(batchId, merkleRoot, keccak256("tenant"), 1, 1, payments);
 
         bytes32[] memory wrongProof = new bytes32[](1);
         wrongProof[0] = keccak256("wrong");
@@ -1206,10 +1123,7 @@ contract SetPaymentBatchTest is Test {
 
         assertFalse(
             paymentBatch.verifyPaymentInclusion(
-                keccak256("nonexistent"),
-                keccak256("leaf"),
-                proof,
-                0
+                keccak256("nonexistent"), keccak256("leaf"), proof, 0
             )
         );
     }
@@ -1257,7 +1171,6 @@ contract SetPaymentBatchTest is Test {
 
         // Should work after unpause
         _settleSinglePayment(keccak256("batch1"), _makeDefaultPayment());
-
     }
 
     // =========================================================================
@@ -1267,7 +1180,12 @@ contract SetPaymentBatchTest is Test {
     function test_EdgeCase_MinAmountPayment() public {
         // Default min is 1e4
         SetPaymentBatch.PaymentIntent memory payment = _makePayment(
-            keccak256("intent_min"), payer1, payee1, 1e4, address(usdc), 1,
+            keccak256("intent_min"),
+            payer1,
+            payee1,
+            1e4,
+            address(usdc),
+            1,
             uint64(block.timestamp + 1 hours)
         );
         _settleSinglePayment(keccak256("batch_min"), payment);
@@ -1282,7 +1200,12 @@ contract SetPaymentBatchTest is Test {
         usdc.approve(address(paymentBatch), type(uint256).max);
 
         SetPaymentBatch.PaymentIntent memory payment = _makePayment(
-            keccak256("intent_max"), payer1, payee1, 1e12, address(usdc), 100,
+            keccak256("intent_max"),
+            payer1,
+            payee1,
+            1e12,
+            address(usdc),
+            100,
             uint64(block.timestamp + 1 hours)
         );
         _settleSinglePayment(keccak256("batch_max"), payment);
@@ -1296,8 +1219,7 @@ contract SetPaymentBatchTest is Test {
         // At exactly validUntil: block.timestamp == validUntil means NOT expired
         // because the check is block.timestamp > _payment.validUntil
         SetPaymentBatch.PaymentIntent memory payment = _makePayment(
-            keccak256("intent_exact"), payer1, payee1, 100e6, address(usdc), 1,
-            expiryTime
+            keccak256("intent_exact"), payer1, payee1, 100e6, address(usdc), 1, expiryTime
         );
         _settleSinglePayment(keccak256("batch_exact"), payment);
 
@@ -1306,29 +1228,31 @@ contract SetPaymentBatchTest is Test {
 
     function test_EdgeCase_DifferentPayersSameNonce() public {
         // Same nonce is fine for different payers
-        SetPaymentBatch.PaymentIntent[] memory payments =
-            new SetPaymentBatch.PaymentIntent[](2);
+        SetPaymentBatch.PaymentIntent[] memory payments = new SetPaymentBatch.PaymentIntent[](2);
 
         payments[0] = _makePayment(
-            keccak256("intent1"), payer1, payee1, 100e6, address(usdc), 1,
+            keccak256("intent1"),
+            payer1,
+            payee1,
+            100e6,
+            address(usdc),
+            1,
             uint64(block.timestamp + 1 hours)
         );
         payments[1] = _makePayment(
-            keccak256("intent2"), payer2, payee2, 200e6, address(usdc), 1, // same nonce
+            keccak256("intent2"),
+            payer2,
+            payee2,
+            200e6,
+            address(usdc),
+            1, // same nonce
             uint64(block.timestamp + 1 hours)
         );
 
         bytes32 batchId = keccak256("batch_same_nonce");
 
         vm.prank(sequencer);
-        paymentBatch.settleBatch(
-            batchId,
-            keccak256("root"),
-            keccak256("tenant"),
-            1,
-            2,
-            payments
-        );
+        paymentBatch.settleBatch(batchId, keccak256("root"), keccak256("tenant"), 1, 2, payments);
 
         SetPaymentBatch.BatchSettlement memory batch = paymentBatch.getBatch(batchId);
         assertEq(batch.paymentCount, 2); // both succeed
@@ -1337,29 +1261,31 @@ contract SetPaymentBatchTest is Test {
     function test_EdgeCase_SamePayerSameNonceSameBatch() public {
         // Two payments with same payer and nonce in the same batch.
         // First succeeds; second fails because nonce is consumed.
-        SetPaymentBatch.PaymentIntent[] memory payments =
-            new SetPaymentBatch.PaymentIntent[](2);
+        SetPaymentBatch.PaymentIntent[] memory payments = new SetPaymentBatch.PaymentIntent[](2);
 
         payments[0] = _makePayment(
-            keccak256("intent1"), payer1, payee1, 100e6, address(usdc), 1,
+            keccak256("intent1"),
+            payer1,
+            payee1,
+            100e6,
+            address(usdc),
+            1,
             uint64(block.timestamp + 1 hours)
         );
         payments[1] = _makePayment(
-            keccak256("intent2"), payer1, payee2, 50e6, address(usdc), 1, // same nonce
+            keccak256("intent2"),
+            payer1,
+            payee2,
+            50e6,
+            address(usdc),
+            1, // same nonce
             uint64(block.timestamp + 1 hours)
         );
 
         bytes32 batchId = keccak256("batch_dup_nonce");
 
         vm.prank(sequencer);
-        paymentBatch.settleBatch(
-            batchId,
-            keccak256("root"),
-            keccak256("tenant"),
-            1,
-            2,
-            payments
-        );
+        paymentBatch.settleBatch(batchId, keccak256("root"), keccak256("tenant"), 1, 2, payments);
 
         SetPaymentBatch.BatchSettlement memory batch = paymentBatch.getBatch(batchId);
         assertEq(batch.paymentCount, 1); // only first succeeds
@@ -1370,29 +1296,19 @@ contract SetPaymentBatchTest is Test {
         // Two payments with the same intentId in one batch
         bytes32 intentId = keccak256("duplicate_intent");
 
-        SetPaymentBatch.PaymentIntent[] memory payments =
-            new SetPaymentBatch.PaymentIntent[](2);
+        SetPaymentBatch.PaymentIntent[] memory payments = new SetPaymentBatch.PaymentIntent[](2);
 
         payments[0] = _makePayment(
-            intentId, payer1, payee1, 100e6, address(usdc), 1,
-            uint64(block.timestamp + 1 hours)
+            intentId, payer1, payee1, 100e6, address(usdc), 1, uint64(block.timestamp + 1 hours)
         );
         payments[1] = _makePayment(
-            intentId, payer1, payee2, 50e6, address(usdc), 2,
-            uint64(block.timestamp + 1 hours)
+            intentId, payer1, payee2, 50e6, address(usdc), 2, uint64(block.timestamp + 1 hours)
         );
 
         bytes32 batchId = keccak256("batch_dup_intent");
 
         vm.prank(sequencer);
-        paymentBatch.settleBatch(
-            batchId,
-            keccak256("root"),
-            keccak256("tenant"),
-            1,
-            2,
-            payments
-        );
+        paymentBatch.settleBatch(batchId, keccak256("root"), keccak256("tenant"), 1, 2, payments);
 
         SetPaymentBatch.BatchSettlement memory batch = paymentBatch.getBatch(batchId);
         assertEq(batch.paymentCount, 1); // second should fail as already settled
@@ -1419,12 +1335,7 @@ contract SetPaymentBatchTest is Test {
 
         vm.prank(sequencer);
         paymentBatch.settleBatch(
-            batchId,
-            keccak256("root"),
-            keccak256("tenant"),
-            1,
-            uint64(batchSize),
-            payments
+            batchId, keccak256("root"), keccak256("tenant"), 1, uint64(batchSize), payments
         );
 
         SetPaymentBatch.BatchSettlement memory batch = paymentBatch.getBatch(batchId);
@@ -1435,7 +1346,12 @@ contract SetPaymentBatchTest is Test {
     function test_EdgeCase_SelfPayment() public {
         // Payer and payee are the same address
         SetPaymentBatch.PaymentIntent memory payment = _makePayment(
-            keccak256("self_pay"), payer1, payer1, 100e6, address(usdc), 1,
+            keccak256("self_pay"),
+            payer1,
+            payer1,
+            100e6,
+            address(usdc),
+            1,
             uint64(block.timestamp + 1 hours)
         );
 
@@ -1461,54 +1377,47 @@ contract SetPaymentBatchTest is Test {
 
         // Sequencer 1 settles a batch
         SetPaymentBatch.PaymentIntent memory payment1 = _makePayment(
-            keccak256("intent1"), payer1, payee1, 100e6, address(usdc), 1,
+            keccak256("intent1"),
+            payer1,
+            payee1,
+            100e6,
+            address(usdc),
+            1,
             uint64(block.timestamp + 1 hours)
         );
         _settleSinglePayment(keccak256("batch1"), payment1);
 
         // Sequencer 2 settles a batch
         SetPaymentBatch.PaymentIntent memory payment2 = _makePayment(
-            keccak256("intent2"), payer2, payee2, 200e6, address(usdc), 1,
+            keccak256("intent2"),
+            payer2,
+            payee2,
+            200e6,
+            address(usdc),
+            1,
             uint64(block.timestamp + 1 hours)
         );
         SetPaymentBatch.PaymentIntent[] memory payments = _makePaymentArray(payment2);
 
         vm.prank(sequencer2);
         paymentBatch.settleBatch(
-            keccak256("batch2"),
-            keccak256("root2"),
-            keccak256("tenant"),
-            2,
-            2,
-            payments
+            keccak256("batch2"), keccak256("root2"), keccak256("tenant"), 2, 2, payments
         );
 
-
-        SetPaymentBatch.BatchSettlement memory batch1 = paymentBatch.getBatch(
-            keccak256("batch1")
-        );
-        SetPaymentBatch.BatchSettlement memory batch2 = paymentBatch.getBatch(
-            keccak256("batch2")
-        );
+        SetPaymentBatch.BatchSettlement memory batch1 = paymentBatch.getBatch(keccak256("batch1"));
+        SetPaymentBatch.BatchSettlement memory batch2 = paymentBatch.getBatch(keccak256("batch2"));
     }
 
     function test_RevokedSequencer_CannotSettle() public {
         vm.prank(owner);
         paymentBatch.setSequencerAuthorization(sequencer, false);
 
-        SetPaymentBatch.PaymentIntent[] memory payments = _makePaymentArray(
-            _makeDefaultPayment()
-        );
+        SetPaymentBatch.PaymentIntent[] memory payments = _makePaymentArray(_makeDefaultPayment());
 
         vm.prank(sequencer);
         vm.expectRevert(SetPaymentBatch.NotAuthorizedSequencer.selector);
         paymentBatch.settleBatch(
-            keccak256("batch1"),
-            keccak256("root"),
-            keccak256("tenant"),
-            1,
-            1,
-            payments
+            keccak256("batch1"), keccak256("root"), keccak256("tenant"), 1, 1, payments
         );
     }
 
@@ -1556,20 +1465,15 @@ contract SetPaymentBatchTest is Test {
         uint256 payerBefore = usdc.balanceOf(payer1);
         uint256 payeeBefore = usdc.balanceOf(payee1);
 
-        _settleSinglePayment(
-            keccak256(abi.encodePacked("fuzz_batch", amount)),
-            payment
-        );
+        _settleSinglePayment(keccak256(abi.encodePacked("fuzz_batch", amount)), payment);
 
         assertEq(usdc.balanceOf(payer1), payerBefore - amount);
         assertEq(usdc.balanceOf(payee1), payeeBefore + amount);
     }
 
-    function testFuzz_ConfigureAsset(
-        uint256 minAmount,
-        uint256 maxAmount,
-        uint256 dailyLimit
-    ) public {
+    function testFuzz_ConfigureAsset(uint256 minAmount, uint256 maxAmount, uint256 dailyLimit)
+        public
+    {
         vm.assume(minAmount > 0);
         vm.assume(dailyLimit <= type(uint128).max);
         vm.assume(maxAmount >= minAmount);
@@ -1606,27 +1510,29 @@ contract SetPaymentBatchTest is Test {
         bytes32 merkleRoot = keccak256("integrity_root");
         bytes32 tenantStoreKey = keccak256("tenant_store_key");
 
-        SetPaymentBatch.PaymentIntent[] memory payments =
-            new SetPaymentBatch.PaymentIntent[](2);
+        SetPaymentBatch.PaymentIntent[] memory payments = new SetPaymentBatch.PaymentIntent[](2);
 
         payments[0] = _makePayment(
-            keccak256("i1"), payer1, payee1, 100e6, address(usdc), 1,
+            keccak256("i1"),
+            payer1,
+            payee1,
+            100e6,
+            address(usdc),
+            1,
             uint64(block.timestamp + 1 hours)
         );
         payments[1] = _makePayment(
-            keccak256("i2"), payer2, payee2, 200e6, address(usdc), 1,
+            keccak256("i2"),
+            payer2,
+            payee2,
+            200e6,
+            address(usdc),
+            1,
             uint64(block.timestamp + 1 hours)
         );
 
         vm.prank(sequencer);
-        paymentBatch.settleBatch(
-            batchId,
-            merkleRoot,
-            tenantStoreKey,
-            5,
-            10,
-            payments
-        );
+        paymentBatch.settleBatch(batchId, merkleRoot, tenantStoreKey, 5, 10, payments);
 
         SetPaymentBatch.BatchSettlement memory batch = paymentBatch.getBatch(batchId);
         assertEq(batch.merkleRoot, merkleRoot);
@@ -1642,29 +1548,31 @@ contract SetPaymentBatchTest is Test {
 
     function test_BatchSettlement_PrimaryTokenFromFirstPayment() public {
         // When batch has mixed tokens, primary token is first payment's token
-        SetPaymentBatch.PaymentIntent[] memory payments =
-            new SetPaymentBatch.PaymentIntent[](2);
+        SetPaymentBatch.PaymentIntent[] memory payments = new SetPaymentBatch.PaymentIntent[](2);
 
         payments[0] = _makePayment(
-            keccak256("i1"), payer1, payee1, 100e6, address(ssUsd), 1,
+            keccak256("i1"),
+            payer1,
+            payee1,
+            100e6,
+            address(ssUsd),
+            1,
             uint64(block.timestamp + 1 hours)
         );
         payments[1] = _makePayment(
-            keccak256("i2"), payer2, payee2, 200e6, address(usdc), 1,
+            keccak256("i2"),
+            payer2,
+            payee2,
+            200e6,
+            address(usdc),
+            1,
             uint64(block.timestamp + 1 hours)
         );
 
         bytes32 batchId = keccak256("mixed_batch");
 
         vm.prank(sequencer);
-        paymentBatch.settleBatch(
-            batchId,
-            keccak256("root"),
-            keccak256("tenant"),
-            1,
-            2,
-            payments
-        );
+        paymentBatch.settleBatch(batchId, keccak256("root"), keccak256("tenant"), 1, 2, payments);
 
         SetPaymentBatch.BatchSettlement memory batch = paymentBatch.getBatch(batchId);
         assertEq(batch.token, address(ssUsd)); // primary from first payment
@@ -1677,13 +1585,23 @@ contract SetPaymentBatchTest is Test {
     function test_DailyVolume_AccumulatesCorrectly() public {
         // Settle two payments on the same token
         SetPaymentBatch.PaymentIntent memory payment1 = _makePayment(
-            keccak256("vol1"), payer1, payee1, 100e6, address(usdc), 1,
+            keccak256("vol1"),
+            payer1,
+            payee1,
+            100e6,
+            address(usdc),
+            1,
             uint64(block.timestamp + 1 hours)
         );
         _settleSinglePayment(keccak256("b1"), payment1);
 
         SetPaymentBatch.PaymentIntent memory payment2 = _makePayment(
-            keccak256("vol2"), payer1, payee1, 200e6, address(usdc), 2,
+            keccak256("vol2"),
+            payer1,
+            payee1,
+            200e6,
+            address(usdc),
+            2,
             uint64(block.timestamp + 1 hours)
         );
         _settleSinglePayment(keccak256("b2"), payment2);
@@ -1695,23 +1613,29 @@ contract SetPaymentBatchTest is Test {
     function test_DailyVolume_IndependentPerToken() public {
         // Settle payments in different tokens
         SetPaymentBatch.PaymentIntent memory paymentUsdc = _makePayment(
-            keccak256("usdc_vol"), payer1, payee1, 100e6, address(usdc), 1,
+            keccak256("usdc_vol"),
+            payer1,
+            payee1,
+            100e6,
+            address(usdc),
+            1,
             uint64(block.timestamp + 1 hours)
         );
         _settleSinglePayment(keccak256("b_usdc"), paymentUsdc);
 
         SetPaymentBatch.PaymentIntent memory paymentSsUsd = _makePayment(
-            keccak256("ssusd_vol"), payer1, payee1, 200e6, address(ssUsd), 2,
+            keccak256("ssusd_vol"),
+            payer1,
+            payee1,
+            200e6,
+            address(ssUsd),
+            2,
             uint64(block.timestamp + 1 hours)
         );
         _settleSinglePayment(keccak256("b_ssusd"), paymentSsUsd);
 
-        SetPaymentBatch.AssetConfig memory usdcConfig = paymentBatch.getAssetConfig(
-            address(usdc)
-        );
-        SetPaymentBatch.AssetConfig memory ssUsdConfig = paymentBatch.getAssetConfig(
-            address(ssUsd)
-        );
+        SetPaymentBatch.AssetConfig memory usdcConfig = paymentBatch.getAssetConfig(address(usdc));
+        SetPaymentBatch.AssetConfig memory ssUsdConfig = paymentBatch.getAssetConfig(address(ssUsd));
 
         assertEq(usdcConfig.dailyVolume, 100e6);
         assertEq(ssUsdConfig.dailyVolume, 200e6);

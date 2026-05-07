@@ -21,9 +21,7 @@ contract SetPaymasterTest is Test {
     event MerchantSponsored(address indexed merchant, uint256 tierId);
     event MerchantRevoked(address indexed merchant);
     event GasSponsored(
-        address indexed merchant,
-        uint256 amount,
-        SetPaymaster.OperationType operationType
+        address indexed merchant, uint256 amount, SetPaymaster.OperationType operationType
     );
     event GasRefunded(address indexed merchant, uint256 amount);
     event Deposited(address indexed from, uint256 amount);
@@ -36,10 +34,7 @@ contract SetPaymasterTest is Test {
         paymasterImpl = new SetPaymaster();
 
         // Deploy proxy
-        bytes memory initData = abi.encodeCall(
-            SetPaymaster.initialize,
-            (owner, treasury)
-        );
+        bytes memory initData = abi.encodeCall(SetPaymaster.initialize, (owner, treasury));
         ERC1967Proxy proxy = new ERC1967Proxy(address(paymasterImpl), initData);
         paymaster = SetPaymaster(payable(address(proxy)));
 
@@ -121,19 +116,12 @@ contract SetPaymasterTest is Test {
         vm.expectEmit(true, false, false, true);
         emit TierCreated(3, "Premium", 0.02 ether, 0.2 ether);
 
-        uint256 tierId = paymaster.createTier(
-            "Premium",
-            0.02 ether,
-            0.2 ether,
-            2 ether
-        );
+        uint256 tierId = paymaster.createTier("Premium", 0.02 ether, 0.2 ether, 2 ether);
 
         assertEq(tierId, 3);
         assertEq(paymaster.nextTierId(), 4);
 
-        (string memory name, uint256 maxPerTx, uint256 maxPerDay, , bool active) = paymaster.tiers(
-            3
-        );
+        (string memory name, uint256 maxPerTx, uint256 maxPerDay,, bool active) = paymaster.tiers(3);
         assertEq(name, "Premium");
         assertEq(maxPerTx, 0.02 ether);
         assertEq(maxPerDay, 0.2 ether);
@@ -159,7 +147,7 @@ contract SetPaymasterTest is Test {
 
         paymaster.updateTier(0, 0.002 ether, 0.02 ether, 0.2 ether);
 
-        (, uint256 maxPerTx, uint256 maxPerDay, uint256 maxPerMonth, ) = paymaster.tiers(0);
+        (, uint256 maxPerTx, uint256 maxPerDay, uint256 maxPerMonth,) = paymaster.tiers(0);
         assertEq(maxPerTx, 0.002 ether);
         assertEq(maxPerDay, 0.02 ether);
         assertEq(maxPerMonth, 0.2 ether);
@@ -177,7 +165,7 @@ contract SetPaymasterTest is Test {
         emit TierStatusUpdated(1, false);
         paymaster.setTierActive(1, false);
 
-        (, , , , bool active) = paymaster.tiers(1);
+        (,,,, bool active) = paymaster.tiers(1);
         assertFalse(active);
     }
 
@@ -256,7 +244,7 @@ contract SetPaymasterTest is Test {
         paymaster.revokeMerchant(merchant);
         vm.stopPrank();
 
-        (bool active, , , , ) = paymaster.getMerchantDetails(merchant);
+        (bool active,,,,) = paymaster.getMerchantDetails(merchant);
         assertFalse(active);
     }
 
@@ -318,15 +306,13 @@ contract SetPaymasterTest is Test {
         vm.expectEmit(true, false, false, true);
         emit GasSponsored(merchant, sponsorAmount, SetPaymaster.OperationType.ORDER_CREATE);
         paymaster.executeSponsorship(
-            merchant,
-            sponsorAmount,
-            SetPaymaster.OperationType.ORDER_CREATE
+            merchant, sponsorAmount, SetPaymaster.OperationType.ORDER_CREATE
         );
 
         assertEq(merchant.balance, merchantBalanceBefore + sponsorAmount);
 
-        (, , uint256 spentToday, uint256 spentThisMonth, uint256 totalSponsored) = paymaster
-            .getMerchantDetails(merchant);
+        (,, uint256 spentToday, uint256 spentThisMonth, uint256 totalSponsored) =
+            paymaster.getMerchantDetails(merchant);
         assertEq(spentToday, sponsorAmount);
         assertEq(spentThisMonth, sponsorAmount);
         assertEq(totalSponsored, sponsorAmount);
@@ -354,9 +340,7 @@ contract SetPaymasterTest is Test {
         vm.prank(operator);
         vm.expectRevert(
             abi.encodeWithSelector(
-                SetPaymaster.ExceedsTransactionLimit.selector,
-                0.002 ether,
-                0.001 ether
+                SetPaymaster.ExceedsTransactionLimit.selector, 0.002 ether, 0.001 ether
             )
         );
         paymaster.executeSponsorship(merchant, 0.002 ether, SetPaymaster.OperationType.ORDER_CREATE);
@@ -371,19 +355,13 @@ contract SetPaymasterTest is Test {
         // Use up daily limit
         for (uint256 i = 0; i < 10; i++) {
             paymaster.executeSponsorship(
-                merchant,
-                0.001 ether,
-                SetPaymaster.OperationType.ORDER_CREATE
+                merchant, 0.001 ether, SetPaymaster.OperationType.ORDER_CREATE
             );
         }
 
         // Next should fail - daily limit exhausted
         vm.expectRevert(
-            abi.encodeWithSelector(
-                SetPaymaster.ExceedsDailyLimit.selector,
-                0.001 ether,
-                0
-            )
+            abi.encodeWithSelector(SetPaymaster.ExceedsDailyLimit.selector, 0.001 ether, 0)
         );
         paymaster.executeSponsorship(merchant, 0.001 ether, SetPaymaster.OperationType.ORDER_CREATE);
 
@@ -404,9 +382,7 @@ contract SetPaymasterTest is Test {
             vm.startPrank(operator);
             for (uint256 i = 0; i < 10; i++) {
                 paymaster.executeSponsorship(
-                    merchant,
-                    0.001 ether,
-                    SetPaymaster.OperationType.ORDER_CREATE
+                    merchant, 0.001 ether, SetPaymaster.OperationType.ORDER_CREATE
                 );
             }
             vm.stopPrank();
@@ -420,11 +396,7 @@ contract SetPaymasterTest is Test {
 
         vm.startPrank(operator);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                SetPaymaster.ExceedsMonthlyLimit.selector,
-                0.001 ether,
-                0
-            )
+            abi.encodeWithSelector(SetPaymaster.ExceedsMonthlyLimit.selector, 0.001 ether, 0)
         );
         paymaster.executeSponsorship(merchant, 0.001 ether, SetPaymaster.OperationType.ORDER_CREATE);
 
@@ -449,9 +421,7 @@ contract SetPaymasterTest is Test {
         vm.prank(operator);
         vm.expectRevert(SetPaymaster.InsufficientBalance.selector);
         limitedPaymaster.executeSponsorship(
-            merchant,
-            0.001 ether,
-            SetPaymaster.OperationType.ORDER_CREATE
+            merchant, 0.001 ether, SetPaymaster.OperationType.ORDER_CREATE
         );
     }
 
@@ -462,7 +432,6 @@ contract SetPaymasterTest is Test {
         // Owner can execute without being an operator
         vm.prank(owner);
         paymaster.executeSponsorship(merchant, 0.001 ether, SetPaymaster.OperationType.ORDER_CREATE);
-
     }
 
     // =========================================================================
@@ -478,7 +447,7 @@ contract SetPaymasterTest is Test {
         // Spend some gas
         paymaster.executeSponsorship(merchant, 0.001 ether, SetPaymaster.OperationType.ORDER_CREATE);
 
-        (, , uint256 spentToday1, , ) = paymaster.getMerchantDetails(merchant);
+        (,, uint256 spentToday1,,) = paymaster.getMerchantDetails(merchant);
         assertEq(spentToday1, 0.001 ether);
 
         // Fast forward 1 day
@@ -487,7 +456,7 @@ contract SetPaymasterTest is Test {
         // Spend again - daily should have reset
         paymaster.executeSponsorship(merchant, 0.001 ether, SetPaymaster.OperationType.ORDER_CREATE);
 
-        (, , uint256 spentToday2, uint256 spentMonth, ) = paymaster.getMerchantDetails(merchant);
+        (,, uint256 spentToday2, uint256 spentMonth,) = paymaster.getMerchantDetails(merchant);
         assertEq(spentToday2, 0.001 ether); // Reset to just this tx
         assertEq(spentMonth, 0.002 ether); // Still accumulates monthly
 
@@ -503,7 +472,7 @@ contract SetPaymasterTest is Test {
         // Spend some gas
         paymaster.executeSponsorship(merchant, 0.01 ether, SetPaymaster.OperationType.ORDER_CREATE);
 
-        (, , , uint256 spentMonth1, ) = paymaster.getMerchantDetails(merchant);
+        (,,, uint256 spentMonth1,) = paymaster.getMerchantDetails(merchant);
         assertEq(spentMonth1, 0.01 ether);
 
         // Fast forward 30 days
@@ -512,7 +481,7 @@ contract SetPaymasterTest is Test {
         // Spend again - monthly should have reset
         paymaster.executeSponsorship(merchant, 0.01 ether, SetPaymaster.OperationType.ORDER_CREATE);
 
-        (, , , uint256 spentMonth2, uint256 total) = paymaster.getMerchantDetails(merchant);
+        (,,, uint256 spentMonth2, uint256 total) = paymaster.getMerchantDetails(merchant);
         assertEq(spentMonth2, 0.01 ether); // Reset to just this tx
         assertEq(total, 0.02 ether); // Total still accumulates
 
@@ -537,13 +506,12 @@ contract SetPaymasterTest is Test {
         // Refund some
         vm.expectEmit(true, false, false, true);
         emit GasRefunded(merchant, 0.002 ether);
-        paymaster.refundUnusedGas{value: 0.002 ether}(merchant, 0.002 ether);
+        paymaster.refundUnusedGas{ value: 0.002 ether }(merchant, 0.002 ether);
 
         vm.stopPrank();
 
-        (, , uint256 spentToday, uint256 spentMonth, uint256 total) = paymaster.getMerchantDetails(
-            merchant
-        );
+        (,, uint256 spentToday, uint256 spentMonth, uint256 total) =
+            paymaster.getMerchantDetails(merchant);
         assertEq(spentToday, 0.003 ether);
         assertEq(spentMonth, 0.003 ether);
         assertEq(total, 0.003 ether);
@@ -560,17 +528,15 @@ contract SetPaymasterTest is Test {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                SetPaymaster.RefundExceedsSponsored.selector,
-                0.01 ether,
-                0.001 ether
+                SetPaymaster.RefundExceedsSponsored.selector, 0.01 ether, 0.001 ether
             )
         );
-        paymaster.refundUnusedGas{value: 0.01 ether}(merchant, 0.01 ether);
+        paymaster.refundUnusedGas{ value: 0.01 ether }(merchant, 0.01 ether);
 
         vm.stopPrank();
 
-        (, , uint256 spentToday, uint256 spentMonth, uint256 totalSponsored) = paymaster
-            .getMerchantDetails(merchant);
+        (,, uint256 spentToday, uint256 spentMonth, uint256 totalSponsored) =
+            paymaster.getMerchantDetails(merchant);
         assertEq(spentToday, 0.001 ether);
         assertEq(spentMonth, 0.001 ether);
         assertEq(totalSponsored, 0.001 ether);
@@ -586,12 +552,10 @@ contract SetPaymasterTest is Test {
         vm.prank(operator);
         vm.expectRevert(
             abi.encodeWithSelector(
-                SetPaymaster.RefundValueMismatch.selector,
-                0.001 ether,
-                0.0005 ether
+                SetPaymaster.RefundValueMismatch.selector, 0.001 ether, 0.0005 ether
             )
         );
-        paymaster.refundUnusedGas{value: 0.0005 ether}(merchant, 0.001 ether);
+        paymaster.refundUnusedGas{ value: 0.0005 ether }(merchant, 0.001 ether);
     }
 
     function test_BatchRefundUnusedGas() public {
@@ -605,9 +569,7 @@ contract SetPaymasterTest is Test {
         vm.startPrank(operator);
         paymaster.executeSponsorship(merchant, 0.002 ether, SetPaymaster.OperationType.ORDER_CREATE);
         paymaster.executeSponsorship(
-            merchantTwo,
-            0.003 ether,
-            SetPaymaster.OperationType.PAYMENT_PROCESS
+            merchantTwo, 0.003 ether, SetPaymaster.OperationType.PAYMENT_PROCESS
         );
 
         address[] memory merchants = new address[](2);
@@ -618,13 +580,13 @@ contract SetPaymasterTest is Test {
         refunds[0] = 0.001 ether;
         refunds[1] = 0.002 ether;
 
-        paymaster.batchRefundUnusedGas{value: 0.003 ether}(merchants, refunds);
+        paymaster.batchRefundUnusedGas{ value: 0.003 ether }(merchants, refunds);
         vm.stopPrank();
 
-        (, , uint256 spentTodayOne, uint256 spentMonthOne, uint256 totalOne) = paymaster
-            .getMerchantDetails(merchant);
-        (, , uint256 spentTodayTwo, uint256 spentMonthTwo, uint256 totalTwo) = paymaster
-            .getMerchantDetails(merchantTwo);
+        (,, uint256 spentTodayOne, uint256 spentMonthOne, uint256 totalOne) =
+            paymaster.getMerchantDetails(merchant);
+        (,, uint256 spentTodayTwo, uint256 spentMonthTwo, uint256 totalTwo) =
+            paymaster.getMerchantDetails(merchantTwo);
 
         assertEq(spentTodayOne, 0.001 ether);
         assertEq(spentMonthOne, 0.001 ether);
@@ -644,7 +606,7 @@ contract SetPaymasterTest is Test {
         vm.deal(address(this), 1 ether);
         vm.expectEmit(true, false, false, true);
         emit Deposited(address(this), 0.1 ether);
-        paymaster.deposit{value: 0.1 ether}();
+        paymaster.deposit{ value: 0.1 ether }();
 
         assertEq(paymaster.balance(), balanceBefore + 0.1 ether);
     }
@@ -653,12 +615,10 @@ contract SetPaymasterTest is Test {
         vm.deal(address(this), 1 ether);
         vm.expectRevert(
             abi.encodeWithSelector(
-                SetPaymaster.BelowMinimumDeposit.selector,
-                0.001 ether,
-                0.01 ether
+                SetPaymaster.BelowMinimumDeposit.selector, 0.001 ether, 0.01 ether
             )
         );
-        paymaster.deposit{value: 0.001 ether}();
+        paymaster.deposit{ value: 0.001 ether }();
     }
 
     function test_Deposit_ViaReceive() public {
@@ -667,7 +627,7 @@ contract SetPaymasterTest is Test {
         vm.deal(address(this), 1 ether);
         vm.expectEmit(true, false, false, true);
         emit Deposited(address(this), 0.5 ether);
-        (bool success, ) = address(paymaster).call{value: 0.5 ether}("");
+        (bool success,) = address(paymaster).call{ value: 0.5 ether }("");
         assertTrue(success);
 
         assertEq(paymaster.balance(), balanceBefore + 0.5 ether);
@@ -723,9 +683,7 @@ contract SetPaymasterTest is Test {
         vm.startPrank(operator);
         for (uint256 i = 0; i < 10; i++) {
             paymaster.executeSponsorship(
-                merchant,
-                0.001 ether,
-                SetPaymaster.OperationType.ORDER_CREATE
+                merchant, 0.001 ether, SetPaymaster.OperationType.ORDER_CREATE
             );
         }
         vm.stopPrank();
@@ -766,20 +724,12 @@ contract SetPaymasterTest is Test {
         uint256 merchantBalanceBefore = merchant.balance;
 
         vm.prank(operator);
-        paymaster.executeSponsorship(
-            merchant,
-            amount,
-            SetPaymaster.OperationType.PAYMENT_PROCESS
-        );
+        paymaster.executeSponsorship(merchant, amount, SetPaymaster.OperationType.PAYMENT_PROCESS);
 
         assertEq(merchant.balance, merchantBalanceBefore + amount);
     }
 
-    function testFuzz_CreateTier(
-        uint256 maxPerTx,
-        uint256 maxPerDay,
-        uint256 maxPerMonth
-    ) public {
+    function testFuzz_CreateTier(uint256 maxPerTx, uint256 maxPerDay, uint256 maxPerMonth) public {
         vm.assume(maxPerTx > 0 && maxPerDay > 0 && maxPerMonth > 0);
         vm.assume(maxPerMonth <= type(uint128).max);
         vm.assume(maxPerTx <= maxPerDay);
@@ -788,8 +738,8 @@ contract SetPaymasterTest is Test {
         vm.prank(owner);
         uint256 tierId = paymaster.createTier("Fuzz", maxPerTx, maxPerDay, maxPerMonth);
 
-        (, uint256 storedMaxPerTx, uint256 storedMaxPerDay, uint256 storedMaxPerMonth, ) = paymaster
-            .tiers(tierId);
+        (, uint256 storedMaxPerTx, uint256 storedMaxPerDay, uint256 storedMaxPerMonth,) =
+            paymaster.tiers(tierId);
 
         assertEq(storedMaxPerTx, maxPerTx);
         assertEq(storedMaxPerDay, maxPerDay);
@@ -819,6 +769,5 @@ contract SetPaymasterTest is Test {
             paymaster.executeSponsorship(merchant, 0.001 ether, ops[i]);
         }
         vm.stopPrank();
-
     }
 }
