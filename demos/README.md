@@ -1,33 +1,37 @@
 # demos — exercise the stack end-to-end
 
-Three runnable demos, plus a bundled fixture receipt for offline auditing.
+Five runnable scripts, plus a bundled fixture receipt for offline auditing. **`escrow-lifecycle` and `realmoney-loop` carry 17 invariant assertions between them**; both run on every CI push.
 
 | Demo | What it does | Prereqs |
 |---|---|---|
-| **`escrow-lifecycle.mjs`** | The simplest possible end-to-end test: buyer locks SSDC, seller markDelivered, buyer release. ~120 lines of ethers + the deployed contracts. | anvil + `forge script DeployLocal --broadcast` |
-| **`realmoney-loop.mjs`** | Full `bank → SSDC → escrow → SSDC → bank` cycle. Spawns both bridges, sends mock Stripe events, runs the escrow lifecycle, signs a payout. Multi-currency: `--currency JPY --payout-currency GBP`. | as above + bridges available |
+| **`escrow-lifecycle.mjs`** | The simplest possible end-to-end test: buyer locks SSDC, **buyer markDelivered** (recipient confirms), seller release. ~120 lines of ethers + the deployed contracts. **9 invariant assertions** at each state transition. | anvil + `forge script DeployLocal --broadcast` |
+| **`realmoney-loop.mjs`** | Full `bank → SSDC → escrow → SSDC → bank` cycle. Spawns both bridges, sends mock Stripe events, runs the escrow lifecycle, signs a payout. Multi-currency: `--currency JPY --payout-currency GBP`. **8 invariant assertions** per phase. | as above + bridges available |
 | **`verify-receipt.mjs`** | Independent audit of a receipt — schema, on-chain claims, optional STARK byte-level. No StateSet-server dependency. | RPC reachable; `STARK_BIN=` for compliance bundles |
-| **`audit-with-cast.sh`** | Same audit, but pure shell + `jq` + `cast` (no Node). | as above |
+| **`validate-fixture.mjs`** | Pure schema validation (Draft 2020-12 via ajv). Used by CI as a fast (~10 ms) gate before the slow e2e path. | none — runs offline |
+| **`audit-with-cast.sh`** | Same audit as `verify-receipt`, but pure shell + `jq` + `cast` (no Node). | as above |
 
 ## Run
 
 ```bash
 npm install
 
-# 1. The simplest one — confirms the stack is healthy
+# 1. The simplest one — confirms the stack is healthy (9 assertions inline)
 node escrow-lifecycle.mjs
 ORDER_USD=500 node escrow-lifecycle.mjs
 
-# 2. The full cycle
+# 2. The full multi-process cycle (8 assertions per phase)
 node realmoney-loop.mjs
 node realmoney-loop.mjs --currency JPY --payout-currency GBP
 
-# 3. Verify the bundled fixture, or any receipt you have
+# 3. Verify the bundled fixture (or any receipt you have)
 node verify-receipt.mjs fixtures/agent-receipt.json
 bash audit-with-cast.sh fixtures/agent-receipt.json
+
+# 4. Schema-only check (fast; doesn't need anvil)
+node validate-fixture.mjs
 ```
 
-Or use the orchestrator: `../stack/stateset demo lifecycle` (etc.)
+Or use the orchestrator: `../stack/stateset demo lifecycle` / `../stack/stateset audit` / `../stack/stateset receipts`.
 
 ## Producing real receipts
 
