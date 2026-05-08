@@ -73,12 +73,10 @@ The view a technical evaluator wants after they've read [THESIS.md](../THESIS.md
    └──────────────────────────────────────────────────────────────────────┘
 ```
 
-Run the entire loop in one command: `node ves-demo/realmoney-loop-demo.mjs`.
+Run the entire loop in one command: `./stack/stateset demo realmoney`.
 
 ## Component map
 
-| Layer | Component | Implementation | Demo |
-|-------|-----------|----------------|------|
 ### In this repo
 
 | Layer | Component | Notes | Used by |
@@ -206,57 +204,7 @@ icommerce-quickstart/
 └── stack/stateset         single-entry CLI orchestrator
 ```
 
-### Upstream (referenced, not bundled)
-
-| Repo | Role |
-|---|---|
-| [`stateset/stateset-sequencer`](https://github.com/stateset/stateset-sequencer) | Rust (Axum + Postgres) — VES + x402 API |
-| [`stateset/stateset-starks`](https://github.com/stateset/stateset-starks) | Rust (Winterfell) — STARK prover + `ves-stark` verifier CLI |
-| [`stateset/icommerce-app`](https://github.com/stateset/icommerce-app) | Full platform monorepo: above + MCP tooling, admin UI, sync engine |
-
-### Legacy mention (older monorepo paths in upstream icommerce-app)
-
-```
-ves-demo/              Node demos + bridges
-├── agent-receipt.mjs                  hero
-├── claude-agent-receipt.mjs           buyer + arbiter scenarios
-│   ├── claude-agent-cfo.mjs               CFO scenario
-│   ├── marketplace-fee/yield/...-demo     each commerce primitive
-│   ├── cross-border-demo.mjs              multi-currency
-│   ├── compliance-bundle-demo.mjs         3 STARK policies / tx
-│   ├── supply-chain-demo.mjs              multi-tier B2B
-│   ├── refund-timeout-demo.mjs            buyer protection
-│   ├── subscription-yield-demo.mjs        recurring billing
-│   ├── merchant-statement-demo.mjs        operator aggregation
-│   ├── verify-receipt.mjs                 audit primitive (Node)
-│   ├── audit-with-cast.sh                 audit primitive (pure shell)
-│   ├── validate-receipt.mjs               JSON Schema check
-│   ├── export-statement-csv.mjs           accounting export
-│   ├── bridge-stripe-to-ssdc.mjs          fiat on-ramp
-│   ├── bridge-ssdc-payout.mjs             fiat off-ramp
-│   ├── bridge-mock-stripe-event.mjs       mock event sender
-│   ├── bridge-mock-payout-request.mjs     mock seller-side withdraw
-│   └── realmoney-loop-demo.mjs            full loop end-to-end
-│
-├── schemas/               JSON Schema 2020-12
-│   ├── agent-receipt.v1.schema.json
-│   ├── cross-border-receipt.v1.schema.json
-│   └── compliance-bundle.v1.schema.json
-│
-├── dashboard/             zero-dep static HTML operator UI
-│   └── index.html  (12.7 KB)
-│
-├── bin/
-│   └── stateset           unified CLI dispatcher
-│
-├── docs/
-│   ├── COMPETITIVE.md     vs Stripe / Shopify / PayPal etc.
-│   └── ARCHITECTURE.md    this file
-│
-├── THESIS.md              the narrative
-├── README.md              the front door
-└── setup.sh               one-command bring-up + thesis tour
-```
+> The "In this repo" / "Referenced (upstream)" tables earlier in this doc enumerate exactly what's bundled here vs what lives in [`stateset/icommerce-app`](https://github.com/stateset/icommerce-app), [`stateset/stateset-sequencer`](https://github.com/stateset/stateset-sequencer), and [`stateset/stateset-starks`](https://github.com/stateset/stateset-starks).
 
 ## Where each guarantee comes from
 
