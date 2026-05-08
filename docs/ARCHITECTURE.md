@@ -79,20 +79,30 @@ Run the entire loop in one command: `node ves-demo/realmoney-loop-demo.mjs`.
 
 | Layer | Component | Implementation | Demo |
 |-------|-----------|----------------|------|
-| **L0** | Set Chain L2 (Anvil locally) | OP Stack devnet config in `set/` | `setup.sh` brings it up |
-| **L1** | `SetRegistry` | UUPS proxy, anchors batch root + STARK proof | every demo emits via `commitBatchWithStarkProof` |
-| **L1** | `SetPaymentBatch` | UUPS proxy, x402 batch settlement | not used in current demos (alt path) |
-| **L1** | `SetPaymaster` | UUPS proxy, gas sponsorship | not used in current demos |
-| **L1** | `OrderEscrow` | Plain contract, 13/13 tests pass | every commerce demo |
-| **L1** | `FxOracle` | Plain contract, 7/7 tests pass | `cross-border-demo.mjs` |
-| **L1** | `SSDC` (+ `NAVOracle`) | Production rebasing stablecoin | `production-ssdc-demo.mjs`, `yield-rebasing-demo.mjs` |
-| **L1** | `MockSsUSD` | 6dp test ERC-20 | `agent-receipt.mjs` (legacy path) |
-| **L2** | `stateset-sequencer` | Rust, Axum + Postgres, VES events + x402 | every agent-receipt demo |
-| **L2** | `set-anchor` | Rust, polls sequencer → SetRegistry | currently disabled (auth bug); demos drive synchronously |
-| **L3** | `ves-stark` CLI | Rust, Winterfell prover/verifier | `compliance-bundle-demo.mjs`, `verify-receipt.mjs` |
-| **L4** | Stripe bridges (on/off-ramp) | Node, plain `node:http` | `bridge-stripe-to-ssdc.mjs` + `bridge-ssdc-payout.mjs` |
-| **L5** | MCP tools (11) | JS, registered in `cli/src/tools/agent-receipt.js` | every Claude scenario |
-| **L5** | CLI / dashboard / CSV export | Bash + static HTML + Node | `bin/stateset`, `dashboard/index.html`, `export-statement-csv.mjs` |
+### In this repo
+
+| Layer | Component | Notes | Used by |
+|-------|-----------|-------|---------|
+| **L0** | Anvil (local devnet) | Chain id 84532001 | `bash stack/setup.sh` + `./stack/stateset up` |
+| **L1** | `SetRegistry` | UUPS proxy; anchors batch root + STARK proof. **46 tests** | not exercised by the bundled demos (no sequencer here) |
+| **L1** | `SetPaymentBatch` | UUPS proxy; x402 batch settlement. **75 tests** | not exercised by demos; tested in isolation |
+| **L1** | `SetPaymaster` | UUPS proxy; gas sponsorship. **48 tests** | tested in isolation |
+| **L1** | `OrderEscrow` | Plain contract; 5-state lifecycle. **13 tests** | both `escrow-lifecycle` and `realmoney-loop` demos |
+| **L1** | `FxOracle` | Per-pair quotes with TTL. **7 tests** | `realmoney-loop --currency JPY --payout-currency GBP` |
+| **L1** | `SSDC` + `NAVOracle` | Rebasing T-Bill-backed stablecoin. **27 NAVOracle tests** | every demo (every commerce flow settles in SSDC) |
+| **L1** | `MockSsUSD` | 6dp test ERC-20 | only used by deploy script + tests |
+| **L4** | Stripe bridges (`on-ramp.mjs`, `off-ramp.mjs`) | Node, plain `node:http`; **35 unit tests** standalone | `realmoney-loop` (spawns both as child processes) |
+| **L5** | `stateset` CLI | Bash, 21 subcommands | the operator entry point |
+
+Total: **216 contract tests** + **35 bridge unit tests** + **17 invariant assertions** across 3 e2e CI runs.
+
+### Referenced (upstream, not bundled here)
+
+| Component | Repo | Purpose |
+|-----------|------|---------|
+| `stateset-sequencer` | [`stateset/stateset-sequencer`](https://github.com/stateset/stateset-sequencer) | Rust (Axum + Postgres) — VES events + x402 API. Required for full agent-receipt minting. |
+| `ves-stark` CLI | [`stateset/stateset-starks`](https://github.com/stateset/stateset-starks) | Rust (Winterfell) — STARK prover/verifier. Used by `verify-receipt.mjs` for compliance-bundle byte-level audit. |
+| MCP tools, admin UI, sync engine | [`stateset/icommerce-app`](https://github.com/stateset/icommerce-app) | Full platform monorepo: receipt-producer, AI-agent integrations, operator dashboard. |
 
 ## Trust boundaries
 
