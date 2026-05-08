@@ -219,8 +219,8 @@ icommerce-quickstart/
 | "Multi-currency without trust" | `FxOracle.convert()` — quote stored on chain, freshness enforced, applied rate bound into `deliveryReceiptHash` |
 | "Compliance is portable" | Three independent STARK policies per `compliance-bundle`; each verifiable per-policy |
 | "Anyone can audit" | `verify-receipt.mjs` (Node) and `audit-with-cast.sh` (pure shell) re-check every claim against chain + run STARK byte-level verification |
-| "Receipts are interop" | `schemas/*.json` (JSON Schema 2020-12) + `validate-receipt.mjs` (ajv) |
-| "AI agents can drive everything" | 11 MCP tools in `cli/src/tools/agent-receipt.js` |
+| "Receipts are interop" | `schemas/*.json` (JSON Schema 2020-12) + [`demos/validate-fixture.mjs`](../demos/validate-fixture.mjs) (ajv) |
+| "AI agents can drive everything" | MCP tools in the upstream [`stateset/icommerce-app`](https://github.com/stateset/icommerce-app) — not in this quickstart |
 
 ## What this architecture does NOT do
 
