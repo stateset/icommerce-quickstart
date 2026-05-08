@@ -4,8 +4,25 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [0.7.1] — 2026-05-07
+
+The "stop drifting" patch. v0.7.0 added 4 new commands and a release table; v0.7.1 closes the doc-drift backlog those additions created and adds one diagnostic improvement.
+
 ### Added
-- `stateset doctor` now checks **FX-quote freshness per pair** (EUR/GBP/JPY/MXN). Stale quotes are reported by name; `--fix` auto-runs `seed-fx`. Closes a gap where doctor said "all clear" but a non-USD demo would then fail with "FX quote stale".
+- `stateset doctor` now checks **FX-quote freshness per pair** (EUR/GBP/JPY/MXN). Stale quotes reported by name; `--fix` auto-runs `seed-fx`. Closes a gap where doctor said "all clear" but the next non-USD demo failed with "FX quote stale" mid-run.
+
+### Fixed
+- **README**: 6 distinct drift fixes — CLI reference (8 → 21 subcommands grouped by purpose), tests section (4 suites/93 → 6 suites/216), `What's in the box` table (stack/docs/scripts entries + escrow-lifecycle ASCII diagram had the iter-9 buyer/seller swap *wrong*; fixed), 5-minute start uses the tighter `audit` shortcut.
+- **`docs/EXAMPLE_RUN.md`**: doctor output missed the FX-freshness check from this release; test counts stuck at v0.3.0 (93 → 216, 4 → 6 suites). Added a `stateset show` snippet so the chain-state view is also documented.
+- **`docs/ARCHITECTURE.md`**: replaced upstream-only L0-L5 component table (cited a dozen demos and files that don't exist here) with two correct tables — what's in this repo with real per-component test counts, and what's referenced upstream with links. Removed a duplicate "Upstream" section + a "Legacy mention" file tree (~50 lines) showing 14+ paths that aren't here. Fixed wrong hero-command path (`ves-demo/realmoney-loop-demo.mjs` → `./stack/stateset demo realmoney`). Renamed `validate-receipt.mjs` → `validate-fixture.mjs`. Clarified MCP-tools claim points at upstream, not this quickstart.
+- **`docs/THREAT_MODEL.md` + `docs/BRIDGES.md`**: 3 broken anchor links inside tables — pointed at `ves-demo/bridge-*.mjs` (upstream), now point at `bridges/on-ramp.mjs` / `bridges/off-ramp.mjs`. These were the worst kind of drift (clickable 404s).
+- **`demos/README.md`**: same iter-9 buyer/seller markDelivered swap caught here too. Plus `validate-fixture.mjs` (iter-13) was missing from the demos table.
+- **`contracts/README.md`**: 4 fixes — stale `--no-commit` forge flags, contract count (6 → 7), broken `(in the main repo)` parenthetical for DEPLOY_SEPOLIA.md (it's local), incomplete env-var list for Sepolia deploy (4 → 9 vars). Added the `stateset deploy:sepolia` wrapper as the recommended path.
+
+### Verified
+- `grep -rn "ves-demo/|set/contracts/|cli/src/|crates/" docs/ *.md` returns empty across the repo's docs. No more upstream-only paths in user-facing content.
+- All 7 prior releases still link to the correct sources.
+- 216/216 contract tests + 35/35 bridge tests + 17 invariant assertions still green.
 
 ## [0.7.0] — 2026-05-07
 
