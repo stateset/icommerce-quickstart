@@ -44,7 +44,8 @@ That's it. You now have a working StateSet iCommerce stack on your machine.
 
 | Tag | Date | Headline |
 |---|---|---|
-| **[v0.7.0](https://github.com/stateset/icommerce-quickstart/releases/tag/v0.7.0)** | 2026-05-07 | Operator surface gets serious — `show` + `audit` + `receipts` + `gates` + completion + gas baseline |
+| **[v0.7.1](https://github.com/stateset/icommerce-quickstart/releases/tag/v0.7.1)** | 2026-05-07 | Stop drifting — 22 doc fixes, doctor checks FX freshness per pair |
+| [v0.7.0](https://github.com/stateset/icommerce-quickstart/releases/tag/v0.7.0) | 2026-05-07 | Operator surface gets serious — `show` + `audit` + `receipts` + `gates` + completion + gas baseline |
 | [v0.6.0](https://github.com/stateset/icommerce-quickstart/releases/tag/v0.6.0) | 2026-05-07 | Multi-process e2e is now strict — 17 invariant assertions across both demos |
 | [v0.5.0](https://github.com/stateset/icommerce-quickstart/releases/tag/v0.5.0) | 2026-05-07 | Multi-currency e2e is now a CI test — JPY→GBP cycle runs every push |
 | [v0.4.0](https://github.com/stateset/icommerce-quickstart/releases/tag/v0.4.0) | 2026-05-07 | Every commerce contract under test — 216 tests (up from 93) |
