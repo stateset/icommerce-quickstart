@@ -25,8 +25,8 @@ The protocol's safety reduces to these assumptions. If any one of them fails, th
 
 | Threat | Mitigation | Code | Residual |
 |--------|------------|------|----------|
-| Forged Stripe webhook to mint SSDC | HMAC-SHA256 over `${t}.${rawBody}` with shared secret; 5-min timestamp tolerance; constant-time compare | [`verifyStripeSignature`](../ves-demo/bridge-stripe-to-ssdc.mjs) | Bridge operator's webhook secret in env → must be in a sealed secret store in production |
-| Forged payout request claiming to be seller | secp256k1 signature on a canonical message bound to seller address, nonce, chainId, timestamp | [`payoutMessage` + `verifyMessage`](../ves-demo/bridge-ssdc-payout.mjs) | None at protocol; relies on seller wallet hygiene |
+| Forged Stripe webhook to mint SSDC | HMAC-SHA256 over `${t}.${rawBody}` with shared secret; 5-min timestamp tolerance; constant-time compare | [`verifyStripeSignature`](../bridges/on-ramp.mjs) | Bridge operator's webhook secret in env → must be in a sealed secret store in production |
+| Forged payout request claiming to be seller | secp256k1 signature on a canonical message bound to seller address, nonce, chainId, timestamp | [`payoutMessage` + `verifyMessage`](../bridges/off-ramp.mjs) | None at protocol; relies on seller wallet hygiene |
 | Forged VES event in the sequencer | Each event Ed25519-signed by its agent; sequencer rejects on signature mismatch | sequencer ingest pipeline | None at protocol |
 | Forged STARK proof | Winterfell verifier rejects under A5 | `ves-stark verify` (off-chain), `audit-with-cast.sh` | A5 (~82-bit security; multi-prover composition for higher) |
 | Sybil — one agent claiming to be many | Unaddressed at protocol; agents are EOAs | — | KYC/identity is off-chain ops concern |

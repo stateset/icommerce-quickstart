@@ -2,7 +2,7 @@
 
 How to take the StateSet on-ramp / off-ramp bridges from the local demo to a real Stripe + EVM deployment. Pairs with [ARCHITECTURE.md](./ARCHITECTURE.md) (system diagrams) and [THREAT_MODEL.md](./THREAT_MODEL.md) (what could break).
 
-The demo code in `ves-demo/bridge-stripe-to-ssdc.mjs` and `ves-demo/bridge-ssdc-payout.mjs` is **production-shaped, not production-ready** — every signature scheme, message format, and ABI matches what real Stripe expects, but several hardening steps must be added before mainnet exposure. Each is listed below with the specific code change.
+The demo code in [`bridges/on-ramp.mjs`](../bridges/on-ramp.mjs) and [`bridges/off-ramp.mjs`](../bridges/off-ramp.mjs) is **production-shaped, not production-ready** — every signature scheme, message format, and ABI matches what real Stripe expects, but several hardening steps must be added before mainnet exposure. Each is listed below with the specific code change.
 
 ---
 
