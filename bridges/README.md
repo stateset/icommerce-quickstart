@@ -29,7 +29,7 @@ The off-ramp message format is byte-deterministic: USD renders as `$200.00 USD` 
 
 ## Tests
 
-41 unit tests run **standalone with no chain**:
+48 unit tests run **standalone with no chain**:
 
 ```bash
 npm test
@@ -46,6 +46,8 @@ The bridges lazy-load their contract addresses from the broadcast log only on `b
 | `STRIPE_WEBHOOK_SECRET` | `whsec_test_local_only` | on-ramp |
 | `STRIPE_IDEMPOTENCY_DIR` | `../stack/.run/stripe-events` | on-ramp |
 | `PAYOUT_NONCE_DIR` | `../stack/.run/payout-nonces` | off-ramp |
+| `MAX_WEBHOOK_BYTES` | `1048576` | on-ramp request-size cap |
+| `MAX_PAYOUT_BYTES` | `1048576` | off-ramp request-size cap |
 | `TREASURY_KEY` | anvil[0] | on-ramp (mints SSDC) |
 | `BRIDGE_TREASURY_KEY` | anvil[6] | off-ramp (receives pulled SSDC) |
 

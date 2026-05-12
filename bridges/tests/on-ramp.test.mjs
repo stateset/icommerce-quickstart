@@ -16,6 +16,8 @@ import {
   failStripeEvent,
   finalizeStripeEvent,
   reserveStripeEvent,
+  stripeMinorToDecimalString,
+  stripeMinorToHuman,
   verifyStripeSignature,
 } from '../on-ramp.mjs';
 
@@ -122,6 +124,24 @@ test('Stripe-style header with extra fields (v0=, scheme=) still validates v1', 
   assert.equal(r.verified, true);
 });
 
+test('Stripe-style header accepts any matching v1 signature during secret rotation', () => {
+  const goodSig = crypto.createHmac('sha256', SECRET).update(`${NOW}.${BODY}`).digest('hex');
+  const wrongSig = crypto.createHmac('sha256', 'whsec_old_or_wrong').update(`${NOW}.${BODY}`).digest('hex');
+  const header = `t=${NOW},v1=${wrongSig},v1=${goodSig}`;
+  const r = verifyStripeSignature(BODY, header, SECRET, { now: NOW });
+  assert.equal(r.verified, true);
+});
+
+test('Stripe-style header rejects when no v1 signature matches', () => {
+  const wrongSig = crypto.createHmac('sha256', 'whsec_wrong_secret').update(`${NOW}.${BODY}`).digest('hex');
+  const malformed = 'not-hex';
+  const header = `t=${NOW},v1=${malformed},v1=${wrongSig}`;
+  assert.throws(
+    () => verifyStripeSignature(BODY, header, SECRET, { now: NOW }),
+    /signature mismatch/,
+  );
+});
+
 test('replay protection requires upstream nonce tracking (this layer is not enough)', () => {
   // Document the boundary: HMAC alone doesn't prevent replay if the same
   // event is delivered twice within the tolerance window. The bridge layer
@@ -179,11 +199,32 @@ test('event id reservation rejects path traversal shaped ids', () => {
   }
 });
 
+test('Stripe minor-unit conversion is exact for decimal and zero-decimal currencies', () => {
+  assert.equal(stripeMinorToDecimalString(12345, 'USD'), '123.45');
+  assert.equal(stripeMinorToDecimalString(5, 'USD'), '0.05');
+  assert.equal(stripeMinorToDecimalString(30000, 'JPY'), '30000');
+  assert.equal(stripeMinorToHuman(12345, 'USD'), 123.45);
+});
+
+test('Stripe minor-unit conversion rejects invalid amounts before minting', () => {
+  assert.throws(
+    () => stripeMinorToDecimalString(0, 'USD'),
+    /amount_total must be a positive integer/,
+  );
+  assert.throws(
+    () => stripeMinorToDecimalString(12.34, 'USD'),
+    /amount_total must be a positive integer/,
+  );
+  assert.throws(
+    () => stripeMinorToDecimalString(Number.MAX_SAFE_INTEGER + 1, 'USD'),
+    /amount_total must be a positive integer/,
+  );
+});
+
 test('hex-decoded v1 of wrong length is rejected', () => {
-  // timingSafeEqual throws on length mismatch — captured as a generic failure.
   const header = `t=${NOW},v1=deadbeef`; // way too short
   assert.throws(
     () => verifyStripeSignature(BODY, header, SECRET, { now: NOW }),
-    /Input buffers must have the same byte length|signature mismatch/,
+    /signature mismatch/,
   );
 });

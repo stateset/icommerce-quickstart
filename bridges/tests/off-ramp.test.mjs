@@ -20,6 +20,7 @@ import { Wallet } from 'ethers';
 import {
   failPayoutNonce,
   finalizePayoutNonce,
+  payoutAmountToMinorUnits,
   payoutMessage,
   reservePayoutNonce,
   verifyPayoutRequest,
@@ -246,6 +247,37 @@ test('bankLast4 must be exactly 4 digits', async () => {
   assert.throws(
     () => verifyPayoutRequest(req2, baseOpts()),
     /bankLast4 must be 4 digits/,
+  );
+});
+
+test('payout amounts convert to Stripe minor units exactly', () => {
+  assert.equal(payoutAmountToMinorUnits(200, 'USD'), 20000);
+  assert.equal(payoutAmountToMinorUnits('150.50', 'GBP'), 15050);
+  assert.equal(payoutAmountToMinorUnits(30000, 'JPY'), 30000);
+  assert.equal(payoutAmountToMinorUnits('30000.00', 'JPY'), 30000);
+});
+
+test('payout amounts reject malformed or over-precise decimals', () => {
+  assert.throws(
+    () => payoutAmountToMinorUnits('abc', 'USD'),
+    /amountUsd must be a positive decimal number/,
+  );
+  assert.throws(
+    () => payoutAmountToMinorUnits('1.001', 'USD'),
+    /USD payouts support at most 2 decimal places/,
+  );
+  assert.throws(
+    () => payoutAmountToMinorUnits('30000.01', 'JPY'),
+    /JPY payouts support at most 0 decimal places/,
+  );
+});
+
+test('verifyPayoutRequest rejects invalid amount before signature recovery', async () => {
+  const req = await makeSignedRequest();
+  req.amountUsd = '1.001';
+  assert.throws(
+    () => verifyPayoutRequest(req, baseOpts()),
+    /USD payouts support at most 2 decimal places/,
   );
 });
 

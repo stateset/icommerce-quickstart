@@ -89,10 +89,10 @@ Run the entire loop in one command: `./stack/stateset demo realmoney`.
 | **L1** | `FxOracle` | Per-pair quotes with TTL. **7 tests** | `realmoney-loop --currency JPY --payout-currency GBP` |
 | **L1** | `SSDC` + `NAVOracle` | Rebasing T-Bill-backed stablecoin. **27 NAVOracle tests** | every demo (every commerce flow settles in SSDC) |
 | **L1** | `MockSsUSD` | 6dp test ERC-20 | only used by deploy script + tests |
-| **L4** | Stripe bridges (`on-ramp.mjs`, `off-ramp.mjs`) | Node, plain `node:http`; **41 unit tests** standalone | `realmoney-loop` (spawns both as child processes) |
+| **L4** | Stripe bridges (`on-ramp.mjs`, `off-ramp.mjs`) | Node, plain `node:http`; **48 unit tests** standalone | `realmoney-loop` (spawns both as child processes) |
 | **L5** | `stateset` CLI | Bash, 21 subcommands | the operator entry point |
 
-Total: **216 contract tests** + **41 bridge unit tests** + **17 invariant assertions** across 3 e2e CI runs.
+Total: **216 contract tests** + **48 bridge unit tests** + **17 invariant assertions** across 3 e2e CI runs.
 
 ### Referenced (upstream, not bundled here)
 

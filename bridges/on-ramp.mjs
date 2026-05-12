@@ -35,6 +35,7 @@ const PORT = Number(process.env.PORT || 4242);
 const RPC_URL = process.env.RPC_URL || 'http://localhost:8545';
 const SECRET = process.env.STRIPE_WEBHOOK_SECRET || 'whsec_test_local_only';
 const SIGNING_TOLERANCE = 5 * 60; // seconds — same as Stripe's default
+const MAX_WEBHOOK_BYTES = Number(process.env.MAX_WEBHOOK_BYTES || 1024 * 1024);
 
 // ─── Locate the deployed contracts ────────────────────────────────────────
 // Read from the repo's own broadcast log produced by `forge script DeployLocal`.
@@ -68,8 +69,19 @@ const SUPPORTED_CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY', 'MXN'];
 const ZERO_DECIMAL_CURRENCIES = new Set([
   'JPY', 'KRW', 'BIF', 'CLP', 'DJF', 'GNF', 'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF',
 ]);
-const stripeMinorToHuman = (minor, currency) =>
-  ZERO_DECIMAL_CURRENCIES.has(currency) ? minor : minor / 100;
+export function stripeMinorToDecimalString(minor, currency) {
+  if (!Number.isSafeInteger(minor) || minor <= 0) {
+    throw new Error('checkout.session amount_total must be a positive integer in minor units');
+  }
+  if (ZERO_DECIMAL_CURRENCIES.has(currency)) return String(minor);
+
+  const raw = String(minor).padStart(3, '0');
+  return `${raw.slice(0, -2)}.${raw.slice(-2)}`;
+}
+
+export function stripeMinorToHuman(minor, currency) {
+  return Number(stripeMinorToDecimalString(minor, currency));
+}
 
 // Treasury (deployer) — only address that can mintShares on SSDC.
 // In production this is a hot wallet held by the bridge operator with a
@@ -115,15 +127,17 @@ export function verifyStripeSignature(rawBody, signatureHeader, secret, options 
 
 function _verifyStripeSignatureImpl(rawBody, signatureHeader, secret, tolerance, nowSec) {
   if (!signatureHeader) throw new Error('missing Stripe-Signature header');
-  const parts = Object.fromEntries(
-    signatureHeader.split(',').map((kv) => {
-      const [k, v] = kv.split('=');
-      return [k.trim(), v?.trim()];
-    }),
-  );
-  const t = parts.t;
-  const v1 = parts.v1;
-  if (!t || !v1) throw new Error('malformed signature header');
+  let t = null;
+  const signatures = [];
+  for (const kv of signatureHeader.split(',')) {
+    const idx = kv.indexOf('=');
+    if (idx === -1) continue;
+    const key = kv.slice(0, idx).trim();
+    const value = kv.slice(idx + 1).trim();
+    if (key === 't') t = value;
+    if (key === 'v1') signatures.push(value);
+  }
+  if (!t || signatures.length === 0) throw new Error('malformed signature header');
   const timestamp = Number(t);
   if (!Number.isFinite(timestamp)) throw new Error('malformed signature timestamp');
 
@@ -134,10 +148,13 @@ function _verifyStripeSignatureImpl(rawBody, signatureHeader, secret, tolerance,
   const signedPayload = `${t}.${rawBody}`;
   const expected = crypto.createHmac('sha256', secret).update(signedPayload).digest('hex');
 
-  // Constant-time compare prevents timing attacks
-  const provided = Buffer.from(v1, 'hex');
   const expectedBuf = Buffer.from(expected, 'hex');
-  if (provided.length !== expectedBuf.length || !crypto.timingSafeEqual(provided, expectedBuf)) {
+  const matched = signatures.some((sig) => {
+    if (!/^[0-9a-fA-F]+$/.test(sig) || sig.length !== expected.length) return false;
+    const provided = Buffer.from(sig, 'hex');
+    return provided.length === expectedBuf.length && crypto.timingSafeEqual(provided, expectedBuf);
+  });
+  if (!matched) {
     throw new Error('signature mismatch');
   }
   return { timestamp, verified: true };
@@ -237,7 +254,8 @@ async function handleEvent(event) {
   if (!SUPPORTED_CURRENCIES.includes(currency)) {
     throw new Error(`unsupported currency ${currency} (supported: ${SUPPORTED_CURRENCIES.join(', ')})`);
   }
-  const amountForeign = stripeMinorToHuman(sess.amount_total, currency);
+  const amountDecimal = stripeMinorToDecimalString(sess.amount_total, currency);
+  const amountForeign = Number(amountDecimal);
 
   // Compute SSDC to mint. USD is 1:1 (NAV starts at $1.00). Non-USD goes
   // through the on-chain FxOracle so an auditor can verify the rate that
@@ -245,13 +263,13 @@ async function handleEvent(event) {
   let sharesToMint, fxRate = null, fxUpdatedAt = null, amountSsUsd;
   if (currency === 'USD') {
     amountSsUsd = amountForeign;
-    sharesToMint = parseUnits(amountForeign.toString(), 18);
+    sharesToMint = parseUnits(amountDecimal, 18);
   } else {
     const pairId = keccak256(toUtf8Bytes(`${currency}/ssUSD`));
     const fxOracle = getFx();
     const fresh = await fxOracle.isFresh(pairId);
     if (!fresh) throw new Error(`FX quote stale or unknown for ${currency}/ssUSD`);
-    const amountIn = parseUnits(amountForeign.toString(), 18);
+    const amountIn = parseUnits(amountDecimal, 18);
     const [amountOut18, rate, updatedAt] = await fxOracle.convert(pairId, amountIn);
     sharesToMint = amountOut18; // SSDC is 18dp — convert output already 1e18-scaled
     amountSsUsd = Number(formatUnits(amountOut18, 18));
@@ -298,9 +316,25 @@ const server = http.createServer(async (req, res) => {
   }
 
   let raw = '';
+  let rawBytes = 0;
+  let tooLarge = false;
   req.setEncoding('utf-8');
-  req.on('data', (chunk) => { raw += chunk; });
+  req.on('data', (chunk) => {
+    if (tooLarge) return;
+    rawBytes += Buffer.byteLength(chunk, 'utf-8');
+    if (rawBytes > MAX_WEBHOOK_BYTES) {
+      tooLarge = true;
+      raw = '';
+      return;
+    }
+    raw += chunk;
+  });
   req.on('end', async () => {
+    if (tooLarge) {
+      res.writeHead(413, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: `request body exceeds ${MAX_WEBHOOK_BYTES} bytes` }));
+      return;
+    }
     let reserved = null;
     let reservedEventId = null;
     try {

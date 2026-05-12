@@ -67,7 +67,7 @@ The protocol's safety reduces to these assumptions. If any one of them fails, th
 |--------|------------|------|----------|
 | Spam the sequencer with bogus events | Per-tenant rate-limits on event ingest; signed events only | sequencer admin config | Out-of-protocol DDoS is an ops concern |
 | Lock 1 wei to clog escrow with millions of zombie orders | `lock()` requires `amount > 0`; gas costs scale per-order | `OrderEscrow.lock` ZeroAmount check | An attacker could still spam small-but-nonzero locks; future: minimum-amount config |
-| Stripe webhook flood | Standard L7 DoS → CDN/rate-limit upstream | — | Operational |
+| Stripe webhook flood | Bridge rejects oversized bodies before parsing; standard L7 DoS still needs CDN/rate-limit upstream | `MAX_WEBHOOK_BYTES` / `MAX_PAYOUT_BYTES` | Operational |
 | FX oracle goes silent (operator stops posting) | `convert()` reverts cleanly; cross-border txs fail-closed (no settlement at unknown rate) | `StaleQuote` revert | Multi-source FX (v2) eliminates single-point dependency |
 | NAVOracle stops attesting | SSDC keeps the last-known NAV; no rebase, but no incorrect rebase either | NAVOracle staleness handling in SSDC | Yield stops accruing; principal protected |
 

@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [0.7.3] — 2026-05-12
+
+The "bridge edge hardening" patch. v0.7.3 tightens the HTTP and parsing boundary around the Stripe-shaped bridge demos.
+
+### Fixed
+- Bridge HTTP edges now reject oversized request bodies via `MAX_WEBHOOK_BYTES` / `MAX_PAYOUT_BYTES`.
+- Stripe webhook signature verification now accepts any matching `v1` signature in a multi-signature header, matching Stripe secret-rotation behavior.
+- Bridge amount parsing now rejects malformed, fractional-minor-unit, unsafe, zero, and negative amounts before chain work.
+
+### Verified
+- 48/48 bridge unit tests green.
+
 ## [0.7.2] — 2026-05-12
 
 The "A+ hardening" patch. v0.7.2 closes the highest-risk review findings: bridge replay/idempotency, stale protocol counters, and local gate drift.

@@ -207,7 +207,7 @@ Every push to `main` runs three jobs in parallel:
 | Job | What it does | Time |
 |---|---|---|
 | `contracts (foundry)` | `forge install` (pinned OZ v5.0.0) → `forge fmt --check` → `forge build --sizes` → `forge test` | ~5 min |
-| `bridges (node --test)` | 41 unit tests, no chain required | ~10 s |
+| `bridges (node --test)` | 48 unit tests, no chain required | ~10 s |
 | `demos (syntax + escrow-lifecycle e2e)` | syntax check → boot anvil → deploy → run `escrow-lifecycle.mjs` with 9 invariant assertions | ~5 min |
 
 Green badge on the README means all 3 passed. The demos job is the strictest — it asserts that contract math actually balances, not just that no tx reverted.

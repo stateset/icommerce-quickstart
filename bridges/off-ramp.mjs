@@ -39,6 +39,7 @@ const RPC_URL = process.env.RPC_URL || 'http://localhost:8545';
 const REQUEST_TTL_SECS = 5 * 60;  // signed payout requests expire in 5 minutes
 const MIN_PAYOUT_USD = 1;
 const MAX_PAYOUT_USD = 1_000_000;
+const MAX_PAYOUT_BYTES = Number(process.env.MAX_PAYOUT_BYTES || 1024 * 1024);
 
 // Symmetric to the on-ramp: same five currencies. Each ISO code maps to a
 // symbol used in the canonical message and a `minorUnits` factor used by the
@@ -52,14 +53,43 @@ export const SUPPORTED_OUTPUT_CURRENCIES = {
   MXN: { symbol: '$', minorUnits: 100, isoLower: 'mxn' },
 };
 
+export function payoutAmountToMinorUnits(amount, currency) {
+  const c = SUPPORTED_OUTPUT_CURRENCIES[currency];
+  if (!c) throw new Error(`unsupported currency ${currency}`);
+
+  const raw = String(amount).trim();
+  if (!/^\d+(\.\d+)?$/.test(raw)) {
+    throw new Error('amountUsd must be a positive decimal number');
+  }
+
+  const [whole, fraction = ''] = raw.split('.');
+  const decimals = c.minorUnits === 1 ? 0 : Math.log10(c.minorUnits);
+  const significantFraction = fraction.replace(/0+$/, '');
+  if (significantFraction.length > decimals) {
+    throw new Error(`${currency} payouts support at most ${decimals} decimal places`);
+  }
+
+  const minor = BigInt(`${whole}${significantFraction.padEnd(decimals, '0')}` || '0');
+  if (minor <= 0n) throw new Error('amountUsd must be greater than zero');
+  if (minor > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new Error('amountUsd is too large to represent safely');
+  }
+  return Number(minor);
+}
+
 function formatAmountForMessage(amount, currency) {
   const c = SUPPORTED_OUTPUT_CURRENCIES[currency];
   if (!c) throw new Error(`unsupported currency ${currency}`);
+  const minorUnits = payoutAmountToMinorUnits(amount, currency);
+
   // Zero-decimal currencies (JPY): integer; otherwise two decimals. Keep
   // locale OUT of formatting so the message is byte-deterministic.
-  return c.minorUnits === 1
-    ? `${c.symbol}${Math.round(Number(amount))}`
-    : `${c.symbol}${Number(amount).toFixed(2)}`;
+  if (c.minorUnits === 1) return `${c.symbol}${minorUnits}`;
+
+  const decimals = Math.log10(c.minorUnits);
+  const whole = Math.trunc(minorUnits / c.minorUnits);
+  const fraction = String(minorUnits % c.minorUnits).padStart(decimals, '0');
+  return `${c.symbol}${whole}.${fraction}`;
 }
 
 // ─── Locate deployed contracts ────────────────────────────────────────────
@@ -301,13 +331,15 @@ export function verifyPayoutRequest(body, opts = {}) {
   if (chainId === undefined) throw new Error('chainId is required');
 
   const { seller, amountUsd, bankLast4, nonce, issuedAt, signature, outputCurrency = 'USD' } = body;
-  if (!seller || !amountUsd || !bankLast4 || !nonce || !issuedAt || !signature) {
+  if (!seller || amountUsd === undefined || amountUsd === null || amountUsd === '' || !bankLast4 || !nonce || !issuedAt || !signature) {
     throw new Error('missing field — seller, amountUsd, bankLast4, nonce, issuedAt, signature required');
   }
   if (!SUPPORTED_OUTPUT_CURRENCIES[outputCurrency]) {
     throw new Error(`unsupported outputCurrency ${outputCurrency} (supported: ${Object.keys(SUPPORTED_OUTPUT_CURRENCIES).join(', ')})`);
   }
-  if (amountUsd < minAmount || amountUsd > maxAmount) {
+  const amountMinorUnits = payoutAmountToMinorUnits(amountUsd, outputCurrency);
+  const amountValue = amountMinorUnits / SUPPORTED_OUTPUT_CURRENCIES[outputCurrency].minorUnits;
+  if (amountValue < minAmount || amountValue > maxAmount) {
     // Bounds remain in the *signed amount's currency*. They're sanity bounds,
     // not policy — fine-grained per-currency limits should live elsewhere.
     throw new Error(`amount must be between ${minAmount} and ${maxAmount}`);
@@ -415,10 +447,10 @@ const server = http.createServer(async (req, res) => {
       bridge_treasury: bridge.address,
       supported_currencies: Object.keys(SUPPORTED_OUTPUT_CURRENCIES),
       message_template: payoutMessage({
-        seller: '0x…', amountUsd: 0, bankLast4: '0000', nonce: 'YOUR_NONCE', issuedAt: 0, chainId: 0,
+        seller: '0x…', amountUsd: 1, bankLast4: '0000', nonce: 'YOUR_NONCE', issuedAt: 0, chainId: 0,
       }),
       message_template_gbp: payoutMessage({
-        seller: '0x…', amountUsd: 0, bankLast4: '0000', nonce: 'YOUR_NONCE', issuedAt: 0, chainId: 0, outputCurrency: 'GBP',
+        seller: '0x…', amountUsd: 1, bankLast4: '0000', nonce: 'YOUR_NONCE', issuedAt: 0, chainId: 0, outputCurrency: 'GBP',
       }),
     });
   }
@@ -428,9 +460,24 @@ const server = http.createServer(async (req, res) => {
   }
 
   let raw = '';
+  let rawBytes = 0;
+  let tooLarge = false;
   req.setEncoding('utf-8');
-  req.on('data', (c) => { raw += c; });
+  req.on('data', (c) => {
+    if (tooLarge) return;
+    rawBytes += Buffer.byteLength(c, 'utf-8');
+    if (rawBytes > MAX_PAYOUT_BYTES) {
+      tooLarge = true;
+      raw = '';
+      return;
+    }
+    raw += c;
+  });
   req.on('end', async () => {
+    if (tooLarge) {
+      send(413, { error: `request body exceeds ${MAX_PAYOUT_BYTES} bytes` });
+      return;
+    }
     try {
       const body = JSON.parse(raw);
       console.log(`[${new Date().toISOString()}] payout request from ${body.seller} for $${body.amountUsd}`);
