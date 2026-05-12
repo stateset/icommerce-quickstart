@@ -29,7 +29,7 @@ The off-ramp message format is byte-deterministic: USD renders as `$200.00 USD` 
 
 ## Tests
 
-48 unit tests run **standalone with no chain**:
+50 unit tests run **standalone with no chain**:
 
 ```bash
 npm test

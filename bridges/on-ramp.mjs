@@ -31,11 +31,27 @@ import {
   keccak256, toUtf8Bytes,
 } from 'ethers';
 
-const PORT = Number(process.env.PORT || 4242);
+export function readPositiveIntegerEnv(name, fallback, source = process.env, options = {}) {
+  const raw = source[name];
+  if (raw === undefined || raw === '') return fallback;
+  if (!/^\d+$/.test(String(raw))) {
+    throw new Error(`${name} must be a positive integer`);
+  }
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new Error(`${name} must be a positive integer`);
+  }
+  if (options.max !== undefined && value > options.max) {
+    throw new Error(`${name} must be <= ${options.max}`);
+  }
+  return value;
+}
+
+const PORT = readPositiveIntegerEnv('PORT', 4242, process.env, { max: 65535 });
 const RPC_URL = process.env.RPC_URL || 'http://localhost:8545';
 const SECRET = process.env.STRIPE_WEBHOOK_SECRET || 'whsec_test_local_only';
 const SIGNING_TOLERANCE = 5 * 60; // seconds — same as Stripe's default
-const MAX_WEBHOOK_BYTES = Number(process.env.MAX_WEBHOOK_BYTES || 1024 * 1024);
+const MAX_WEBHOOK_BYTES = readPositiveIntegerEnv('MAX_WEBHOOK_BYTES', 1024 * 1024);
 
 // ─── Locate the deployed contracts ────────────────────────────────────────
 // Read from the repo's own broadcast log produced by `forge script DeployLocal`.

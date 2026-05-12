@@ -15,6 +15,7 @@ import { join } from 'node:path';
 import {
   failStripeEvent,
   finalizeStripeEvent,
+  readPositiveIntegerEnv,
   reserveStripeEvent,
   stripeMinorToDecimalString,
   stripeMinorToHuman,
@@ -30,6 +31,23 @@ function sign(t, body, secret = SECRET) {
   const sig = crypto.createHmac('sha256', secret).update(`${t}.${body}`).digest('hex');
   return `t=${t},v1=${sig}`;
 }
+
+test('positive integer env parser fails closed on invalid caps and ports', () => {
+  assert.equal(readPositiveIntegerEnv('MAX_WEBHOOK_BYTES', 100, {}), 100);
+  assert.equal(readPositiveIntegerEnv('MAX_WEBHOOK_BYTES', 100, { MAX_WEBHOOK_BYTES: '4096' }), 4096);
+  assert.throws(
+    () => readPositiveIntegerEnv('MAX_WEBHOOK_BYTES', 100, { MAX_WEBHOOK_BYTES: 'abc' }),
+    /MAX_WEBHOOK_BYTES must be a positive integer/,
+  );
+  assert.throws(
+    () => readPositiveIntegerEnv('MAX_WEBHOOK_BYTES', 100, { MAX_WEBHOOK_BYTES: '0' }),
+    /MAX_WEBHOOK_BYTES must be a positive integer/,
+  );
+  assert.throws(
+    () => readPositiveIntegerEnv('PORT', 4242, { PORT: '70000' }, { max: 65535 }),
+    /PORT must be <= 65535/,
+  );
+});
 
 test('valid signature with current timestamp is accepted', () => {
   const header = sign(NOW, BODY);

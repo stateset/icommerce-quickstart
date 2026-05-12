@@ -34,12 +34,28 @@ import {
   keccak256, toUtf8Bytes,
 } from 'ethers';
 
-const PORT = Number(process.env.PORT || 4243);
+export function readPositiveIntegerEnv(name, fallback, source = process.env, options = {}) {
+  const raw = source[name];
+  if (raw === undefined || raw === '') return fallback;
+  if (!/^\d+$/.test(String(raw))) {
+    throw new Error(`${name} must be a positive integer`);
+  }
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new Error(`${name} must be a positive integer`);
+  }
+  if (options.max !== undefined && value > options.max) {
+    throw new Error(`${name} must be <= ${options.max}`);
+  }
+  return value;
+}
+
+const PORT = readPositiveIntegerEnv('PORT', 4243, process.env, { max: 65535 });
 const RPC_URL = process.env.RPC_URL || 'http://localhost:8545';
 const REQUEST_TTL_SECS = 5 * 60;  // signed payout requests expire in 5 minutes
 const MIN_PAYOUT_USD = 1;
 const MAX_PAYOUT_USD = 1_000_000;
-const MAX_PAYOUT_BYTES = Number(process.env.MAX_PAYOUT_BYTES || 1024 * 1024);
+const MAX_PAYOUT_BYTES = readPositiveIntegerEnv('MAX_PAYOUT_BYTES', 1024 * 1024);
 
 // Symmetric to the on-ramp: same five currencies. Each ISO code maps to a
 // symbol used in the canonical message and a `minorUnits` factor used by the

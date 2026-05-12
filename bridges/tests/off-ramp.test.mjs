@@ -22,6 +22,7 @@ import {
   finalizePayoutNonce,
   payoutAmountToMinorUnits,
   payoutMessage,
+  readPositiveIntegerEnv,
   reservePayoutNonce,
   verifyPayoutRequest,
 } from '../off-ramp.mjs';
@@ -55,6 +56,23 @@ const baseOpts = (extras = {}) => ({
   ttl: TTL,
   nonceStore: new Map(),
   ...extras,
+});
+
+test('positive integer env parser fails closed on invalid payout caps and ports', () => {
+  assert.equal(readPositiveIntegerEnv('MAX_PAYOUT_BYTES', 100, {}), 100);
+  assert.equal(readPositiveIntegerEnv('MAX_PAYOUT_BYTES', 100, { MAX_PAYOUT_BYTES: '8192' }), 8192);
+  assert.throws(
+    () => readPositiveIntegerEnv('MAX_PAYOUT_BYTES', 100, { MAX_PAYOUT_BYTES: '1.5' }),
+    /MAX_PAYOUT_BYTES must be a positive integer/,
+  );
+  assert.throws(
+    () => readPositiveIntegerEnv('MAX_PAYOUT_BYTES', 100, { MAX_PAYOUT_BYTES: '-1' }),
+    /MAX_PAYOUT_BYTES must be a positive integer/,
+  );
+  assert.throws(
+    () => readPositiveIntegerEnv('PORT', 4243, { PORT: '65536' }, { max: 65535 }),
+    /PORT must be <= 65535/,
+  );
 });
 
 // ─── happy path ─────────────────────────────────────────────────────────

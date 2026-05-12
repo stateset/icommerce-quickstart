@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [0.7.4] — 2026-05-12
+
+The "config fail-closed" patch. v0.7.4 makes bridge startup reject unsafe numeric environment configuration instead of silently accepting it.
+
+### Fixed
+- Bridge startup now fails closed on invalid numeric env vars instead of letting bad `PORT`, `MAX_WEBHOOK_BYTES`, or `MAX_PAYOUT_BYTES` values become unsafe `NaN` configuration.
+
+### Verified
+- 50/50 bridge unit tests green.
+
 ## [0.7.3] — 2026-05-12
 
 The "bridge edge hardening" patch. v0.7.3 tightens the HTTP and parsing boundary around the Stripe-shaped bridge demos.
