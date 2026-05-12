@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [0.7.2] — 2026-05-12
+
+The "A+ hardening" patch. v0.7.2 closes the highest-risk review findings: bridge replay/idempotency, stale protocol counters, and local gate drift.
+
+### Fixed
+- **Stripe on-ramp idempotency**: `checkout.session.completed` now reserves `event.id` atomically before minting. Processed duplicates return 200 without minting again; in-flight or failed reservations remain non-2xx so Stripe/operator retries do not look completed.
+- **Stripe on-ramp settlement guard**: checkout sessions must have `payment_status=paid` before SSDC is minted.
+- **Payout replay protection**: off-ramp payout requests reserve `(seller, nonce)` durably before balance checks and `transferFrom`, blocking process-restart and concurrent replay attempts.
+- **Bridge marker safety**: idempotency/nonce records reject path-traversal-shaped IDs, close file descriptors reliably, and rewrite status files atomically.
+- **Protocol stats**: `SetRegistry`, `SetPaymentBatch`, and `SetPaymaster` public counters now reflect committed batches, STARK proofs, settled payments, settled volume, settled batches, and sponsored gas.
+- **CLI correctness**: `stateset show` now calls the deployed NAV getter, and `stateset gates` no longer false-fails bridge tests via `grep`/pipefail.
+
+### Verified
+- `./stack/stateset gates` passes all 5 non-chain gates.
+- 216/216 contract tests green.
+- 41/41 bridge unit tests green.
+
 ## [0.7.1] — 2026-05-07
 
 The "stop drifting" patch. v0.7.0 added 4 new commands and a release table; v0.7.1 closes the doc-drift backlog those additions created and adds one diagnostic improvement.

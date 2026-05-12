@@ -12,9 +12,18 @@
 
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
+import fs from 'node:fs';
+import os from 'node:os';
+import { join } from 'node:path';
 import { Wallet } from 'ethers';
 
-import { verifyPayoutRequest, payoutMessage } from '../off-ramp.mjs';
+import {
+  failPayoutNonce,
+  finalizePayoutNonce,
+  payoutMessage,
+  reservePayoutNonce,
+  verifyPayoutRequest,
+} from '../off-ramp.mjs';
 
 // Fixed test signer (anvil[3]) so signatures are reproducible.
 const SELLER_KEY = '0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6';
@@ -133,6 +142,58 @@ test('same nonce used twice is rejected on the second submit', async () => {
     () => verifyPayoutRequest(req, baseOpts({ nonceStore: store })),
     /nonce already used/,
   );
+});
+
+test('durable payout nonce reservation blocks concurrent duplicate requests', () => {
+  const dir = fs.mkdtempSync(join(os.tmpdir(), 'stateset-payout-nonces-'));
+  try {
+    const nonce = '0x' + 'd'.repeat(32);
+    const first = reservePayoutNonce(SELLER_ADDR, nonce, dir);
+    const second = reservePayoutNonce(SELLER_ADDR, nonce, dir);
+    assert.equal(first.reserved, true);
+    assert.equal(second.reserved, false);
+    assert.equal(second.status, 'processing');
+
+    finalizePayoutNonce(SELLER_ADDR, nonce, {
+      pull_tx: '0xabc',
+      pull_block: 42,
+      pull_amount_ssdc_units: '200000000000000000000',
+    }, dir);
+    const third = reservePayoutNonce(SELLER_ADDR, nonce, dir);
+    assert.equal(third.reserved, false);
+    assert.equal(third.status, 'processed');
+
+    const stored = JSON.parse(fs.readFileSync(first.file, 'utf-8'));
+    assert.equal(stored.status, 'processed');
+    assert.equal(stored.pullTx, '0xabc');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('failed payout nonce reservations remain visible as failed duplicates', () => {
+  const dir = fs.mkdtempSync(join(os.tmpdir(), 'stateset-payout-nonces-'));
+  try {
+    const nonce = '0x' + 'e'.repeat(32);
+    const first = reservePayoutNonce(SELLER_ADDR, nonce, dir);
+    assert.equal(first.reserved, true);
+
+    failPayoutNonce(SELLER_ADDR, nonce, new Error('allowance too low'), dir);
+    const second = reservePayoutNonce(SELLER_ADDR, nonce, dir);
+    assert.equal(second.reserved, false);
+    assert.equal(second.status, 'failed');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('durable payout nonce reservation rejects path traversal shaped nonces', () => {
+  const dir = fs.mkdtempSync(join(os.tmpdir(), 'stateset-payout-nonces-'));
+  try {
+    assert.throws(() => reservePayoutNonce(SELLER_ADDR, '../nonce', dir), /invalid nonce/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('different nonces from same seller are independent', async () => {

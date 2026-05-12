@@ -44,6 +44,7 @@ That's it. You now have a working StateSet iCommerce stack on your machine.
 
 | Tag | Date | Headline |
 |---|---|---|
+| **[v0.7.2](https://github.com/stateset/icommerce-quickstart/releases/tag/v0.7.2)** | 2026-05-12 | A+ hardening — bridge replay guards, truthful stats, fixed gates |
 | **[v0.7.1](https://github.com/stateset/icommerce-quickstart/releases/tag/v0.7.1)** | 2026-05-07 | Stop drifting — 22 doc fixes, doctor checks FX freshness per pair |
 | [v0.7.0](https://github.com/stateset/icommerce-quickstart/releases/tag/v0.7.0) | 2026-05-07 | Operator surface gets serious — `show` + `audit` + `receipts` + `gates` + completion + gas baseline |
 | [v0.6.0](https://github.com/stateset/icommerce-quickstart/releases/tag/v0.6.0) | 2026-05-07 | Multi-process e2e is now strict — 17 invariant assertions across both demos |
@@ -60,7 +61,7 @@ That's it. You now have a working StateSet iCommerce stack on your machine.
 | Directory | Contents |
 |---|---|
 | **[`contracts/`](./contracts)** | The 6 Solidity contracts (OrderEscrow, FxOracle, SetRegistry, SSDC, NAVOracle, SetPaymaster) + Foundry config + **216 tests** + deploy scripts |
-| **[`bridges/`](./bridges)** | Fiat ↔ SSDC bridges. Stripe webhook on-ramp + Stripe Treasury off-ramp. **35 unit tests pass standalone** (no chain required). Multi-currency: USD/EUR/GBP/JPY/MXN |
+| **[`bridges/`](./bridges)** | Fiat ↔ SSDC bridges. Stripe webhook on-ramp + Stripe Treasury off-ramp. **41 unit tests pass standalone** (no chain required). Multi-currency: USD/EUR/GBP/JPY/MXN |
 | **[`demos/`](./demos)** | Three runnable demos:<br>• **`escrow-lifecycle`** — buyer locks, seller delivers, buyer releases (no sequencer, no STARK — just escrow)<br>• **`realmoney-loop`** — full fiat→SSDC→escrow→SSDC→fiat cycle, multi-currency<br>• **`verify-receipt`** — independent audit of any receipt |
 | **[`schemas/`](./schemas)** | The 3 JSON Schemas: agent-receipt.v1, compliance-bundle.v1, cross-border-receipt.v1 |
 | **[`stack/`](./stack)** | First-time `setup.sh` + the `stateset` CLI orchestrator (21 subcommands; see [CLI reference](#cli-reference)) |

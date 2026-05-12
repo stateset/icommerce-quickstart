@@ -403,6 +403,12 @@ contract SetPaymentBatchTest is Test {
         assertEq(batch.settledAt, uint64(block.timestamp));
 
         // Verify stats
+        (uint256 totalPayments, uint256 totalVolume, uint256 totalBatches, uint256 sequencers) =
+            paymentBatch.getStats();
+        assertEq(totalPayments, 1);
+        assertEq(totalVolume, 100e6);
+        assertEq(totalBatches, 1);
+        assertEq(sequencers, 1);
     }
 
     function test_SettleBatch_NotSequencer() public {
@@ -1043,9 +1049,13 @@ contract SetPaymentBatchTest is Test {
     }
 
     function test_GetStats() public {
-        // Counters no longer updated in hot path (gas optimization)
-        // Only verify sequencer count works
-        (,,, uint256 sequencers) = paymentBatch.getStats();
+        _settleSinglePayment(keccak256("stats-batch"), _makeDefaultPayment());
+
+        (uint256 totalPayments, uint256 totalVolume, uint256 totalBatches, uint256 sequencers) =
+            paymentBatch.getStats();
+        assertEq(totalPayments, 1);
+        assertEq(totalVolume, 100e6);
+        assertEq(totalBatches, 1);
         assertEq(sequencers, 1);
     }
 

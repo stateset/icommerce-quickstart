@@ -869,6 +869,10 @@ contract SetRegistry is
         });
 
         latestCommitment[tenantStoreKey] = _batchId;
+        headSequence[tenantStoreKey] = _sequenceEnd;
+        unchecked {
+            ++totalCommitments;
+        }
 
         emit BatchCommitted(
             _batchId,
@@ -949,6 +953,9 @@ contract SetRegistry is
             provingTimeMs: _provingTimeMs,
             timestamp: uint64(block.timestamp)
         });
+        unchecked {
+            ++totalStarkProofs;
+        }
 
         emit StarkProofCommitted(_batchId, _proofHash, _policyHash, _allCompliant, _proofSize);
     }
@@ -1089,6 +1096,7 @@ contract SetRegistry is
 
         // Update latest commitment (headSequence derived from commitments)
         latestCommitment[tenantStoreKey] = batchId;
+        headSequence[tenantStoreKey] = uint64(_endSequence);
         unchecked {
             ++totalCommitments;
         }

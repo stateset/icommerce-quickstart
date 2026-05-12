@@ -422,6 +422,12 @@ contract SetPaymentBatch is
             paymentCount: successCount
         });
 
+        totalPaymentsSettled += successCount;
+        totalVolumeSettled += totalAmount;
+        unchecked {
+            ++totalBatchesSettled;
+        }
+
         emit BatchSubmitted(_batchId, _merkleRoot, successCount, totalAmount, primaryToken);
         emit BatchSettled(_batchId, successCount, totalAmount, 0);
     }

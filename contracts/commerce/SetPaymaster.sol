@@ -404,6 +404,7 @@ contract SetPaymaster is
             sponsorship.spentToday += amount128;
             sponsorship.spentThisMonth += amount128;
             sponsorship.totalSponsored += amount128;
+            totalGasSponsored += _amount;
         }
 
         // Transfer gas to merchant
@@ -794,6 +795,7 @@ contract SetPaymaster is
             // Transfer gas to merchant
             (bool success,) = _merchants[i].call{ value: _amounts[i] }("");
             if (success) {
+                totalGasSponsored += _amounts[i];
                 emit GasSponsored(_merchants[i], _amounts[i], _operationTypes[i]);
                 succeeded++;
             } else {
@@ -984,12 +986,7 @@ contract SetPaymaster is
             address treasuryAddr
         )
     {
-        return (
-            address(this).balance,
-            0, // totalGasSponsored removed (derivable from events)
-            nextTierId,
-            treasury
-        );
+        return (address(this).balance, totalGasSponsored, nextTierId, treasury);
     }
 
     /**

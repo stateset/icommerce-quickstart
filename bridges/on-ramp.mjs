@@ -45,6 +45,8 @@ import { dirname, resolve } from 'node:path';
 const __here = dirname(fileURLToPath(import.meta.url));
 const broadcastLog = process.env.BROADCAST_LOG
   || resolve(__here, '../contracts/broadcast/DeployLocal.s.sol/84532001/run-latest.json');
+const IDEMPOTENCY_DIR = process.env.STRIPE_IDEMPOTENCY_DIR
+  || resolve(__here, '../stack/.run/stripe-events');
 
 // LAZY: tests can import verifyStripeSignature without a deployed chain.
 let _addrs = null;
@@ -122,8 +124,10 @@ function _verifyStripeSignatureImpl(rawBody, signatureHeader, secret, tolerance,
   const t = parts.t;
   const v1 = parts.v1;
   if (!t || !v1) throw new Error('malformed signature header');
+  const timestamp = Number(t);
+  if (!Number.isFinite(timestamp)) throw new Error('malformed signature timestamp');
 
-  if (Math.abs(nowSec - Number(t)) > tolerance) {
+  if (Math.abs(nowSec - timestamp) > tolerance) {
     throw new Error('signature timestamp outside tolerance');
   }
 
@@ -131,10 +135,84 @@ function _verifyStripeSignatureImpl(rawBody, signatureHeader, secret, tolerance,
   const expected = crypto.createHmac('sha256', secret).update(signedPayload).digest('hex');
 
   // Constant-time compare prevents timing attacks
-  if (!crypto.timingSafeEqual(Buffer.from(v1, 'hex'), Buffer.from(expected, 'hex'))) {
+  const provided = Buffer.from(v1, 'hex');
+  const expectedBuf = Buffer.from(expected, 'hex');
+  if (provided.length !== expectedBuf.length || !crypto.timingSafeEqual(provided, expectedBuf)) {
     throw new Error('signature mismatch');
   }
-  return { timestamp: Number(t), verified: true };
+  return { timestamp, verified: true };
+}
+
+function safeId(id, field) {
+  if (typeof id !== 'string' || !/^[A-Za-z0-9_.:-]{3,128}$/.test(id)) {
+    throw new Error(`invalid ${field}`);
+  }
+  return id.replace(/[^A-Za-z0-9_.:-]/g, '_');
+}
+
+function readJsonFile(path) {
+  try {
+    return JSON.parse(fs.readFileSync(path, 'utf-8'));
+  } catch {
+    return null;
+  }
+}
+
+function writeJsonAtomic(path, data) {
+  fs.mkdirSync(dirname(path), { recursive: true });
+  const tmp = `${path}.${process.pid}.${Date.now()}.${crypto.randomBytes(4).toString('hex')}.tmp`;
+  try {
+    fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
+    fs.renameSync(tmp, path);
+  } catch (err) {
+    fs.rmSync(tmp, { force: true });
+    throw err;
+  }
+}
+
+export function reserveStripeEvent(eventId, dir = IDEMPOTENCY_DIR) {
+  const file = resolve(dir, `${safeId(eventId, 'event.id')}.json`);
+  fs.mkdirSync(dir, { recursive: true });
+  let fd;
+  try {
+    fd = fs.openSync(file, 'wx');
+    fs.writeFileSync(fd, JSON.stringify({
+      eventId,
+      status: 'processing',
+      reservedAt: new Date().toISOString(),
+    }, null, 2));
+    return { reserved: true, file };
+  } catch (err) {
+    if (err.code === 'EEXIST') {
+      return { reserved: false, file, status: readJsonFile(file)?.status || 'unknown' };
+    }
+    throw err;
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
+  }
+}
+
+export function finalizeStripeEvent(eventId, result, dir = IDEMPOTENCY_DIR) {
+  const file = resolve(dir, `${safeId(eventId, 'event.id')}.json`);
+  writeJsonAtomic(file, {
+    eventId,
+    status: 'processed',
+    processedAt: new Date().toISOString(),
+    txHash: result?.txHash,
+    block: result?.block,
+    buyer: result?.buyer,
+    amountSsUsd: result?.amountSsUsd,
+  });
+}
+
+export function failStripeEvent(eventId, err, dir = IDEMPOTENCY_DIR) {
+  const file = resolve(dir, `${safeId(eventId, 'event.id')}.json`);
+  writeJsonAtomic(file, {
+    eventId,
+    status: 'failed',
+    failedAt: new Date().toISOString(),
+    error: err?.message || String(err),
+  });
 }
 
 // ─── Event handler: mint SSDC when a checkout completes ──────────────────
@@ -144,6 +222,9 @@ async function handleEvent(event) {
   }
   const sess = event.data?.object;
   if (!sess) throw new Error('event has no data.object');
+  if (sess.payment_status !== 'paid') {
+    throw new Error(`checkout.session payment_status must be paid (got ${sess.payment_status || 'missing'})`);
+  }
 
   // The buyer's on-chain wallet is carried in metadata. In production this is
   // populated by the merchant's checkout-session-create call — Stripe stores
@@ -220,15 +301,37 @@ const server = http.createServer(async (req, res) => {
   req.setEncoding('utf-8');
   req.on('data', (chunk) => { raw += chunk; });
   req.on('end', async () => {
+    let reserved = null;
+    let reservedEventId = null;
     try {
       verifyStripeSignature(raw, req.headers['stripe-signature'], SECRET);
       const event = JSON.parse(raw);
       console.log(`[${new Date().toISOString()}] received ${event.type}`);
+      if (event.type === 'checkout.session.completed') {
+        reserved = reserveStripeEvent(event.id);
+        reservedEventId = event.id;
+        if (!reserved.reserved) {
+          console.log(`  ↺ duplicate event ${event.id}; reservation status=${reserved.status}`);
+          if (reserved.status === 'processed') {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ received: true, duplicate: true }));
+          } else {
+            const status = reserved.status === 'processing' ? 409 : 500;
+            res.writeHead(status, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+              error: `event ${event.id} is already ${reserved.status || 'reserved'}`,
+            }));
+          }
+          return;
+        }
+      }
       const result = await handleEvent(event);
+      if (reserved?.reserved) finalizeStripeEvent(event.id, result);
       console.log(`  ✓`, JSON.stringify(result));
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ received: true, ...result }));
     } catch (err) {
+      if (reserved?.reserved && reservedEventId) failStripeEvent(reservedEventId, err);
       console.error(`  ✗ ${err.message}`);
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: err.message }));

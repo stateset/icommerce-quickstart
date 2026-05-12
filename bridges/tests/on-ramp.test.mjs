@@ -8,8 +8,16 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
+import { join } from 'node:path';
 
-import { verifyStripeSignature } from '../on-ramp.mjs';
+import {
+  failStripeEvent,
+  finalizeStripeEvent,
+  reserveStripeEvent,
+  verifyStripeSignature,
+} from '../on-ramp.mjs';
 
 const SECRET = 'whsec_test_for_unit_tests';
 const SIGNING_TOLERANCE = 5 * 60;
@@ -123,6 +131,52 @@ test('replay protection requires upstream nonce tracking (this layer is not enou
   const r2 = verifyStripeSignature(BODY, header, SECRET, { now: NOW + 60 });
   assert.equal(r1.verified, true);
   assert.equal(r2.verified, true, 'second submit also passes signature check; dedupe is upstream');
+});
+
+test('event id reservation blocks duplicate Stripe webhook processing', () => {
+  const dir = fs.mkdtempSync(join(os.tmpdir(), 'stateset-stripe-events-'));
+  try {
+    const first = reserveStripeEvent('evt_duplicate_test', dir);
+    const second = reserveStripeEvent('evt_duplicate_test', dir);
+    assert.equal(first.reserved, true);
+    assert.equal(second.reserved, false);
+    assert.equal(second.status, 'processing');
+
+    finalizeStripeEvent('evt_duplicate_test', { txHash: '0xabc', block: 123, buyer: '0x1' }, dir);
+    const third = reserveStripeEvent('evt_duplicate_test', dir);
+    assert.equal(third.reserved, false);
+    assert.equal(third.status, 'processed');
+
+    const stored = JSON.parse(fs.readFileSync(first.file, 'utf-8'));
+    assert.equal(stored.status, 'processed');
+    assert.equal(stored.txHash, '0xabc');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('failed Stripe event reservations are not treated as processed duplicates', () => {
+  const dir = fs.mkdtempSync(join(os.tmpdir(), 'stateset-stripe-events-'));
+  try {
+    const first = reserveStripeEvent('evt_failed_test', dir);
+    assert.equal(first.reserved, true);
+
+    failStripeEvent('evt_failed_test', new Error('rpc temporarily unavailable'), dir);
+    const second = reserveStripeEvent('evt_failed_test', dir);
+    assert.equal(second.reserved, false);
+    assert.equal(second.status, 'failed');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('event id reservation rejects path traversal shaped ids', () => {
+  const dir = fs.mkdtempSync(join(os.tmpdir(), 'stateset-stripe-events-'));
+  try {
+    assert.throws(() => reserveStripeEvent('../evt_escape', dir), /invalid event\.id/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('hex-decoded v1 of wrong length is rejected', () => {

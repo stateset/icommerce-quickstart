@@ -142,6 +142,10 @@ contract SetRegistryTest is Test {
         assertEq(seqEnd, 10);
         assertEq(eventCount, 10);
         assertGt(timestamp, 0);
+
+        bytes32 tenantStoreKey = keccak256(abi.encodePacked(tenantId, storeId));
+        assertEq(registry.headSequence(tenantStoreKey), 10);
+        assertEq(registry.totalCommitments(), 1);
     }
 
     function test_CommitBatchWithStarkProof() public {
@@ -200,6 +204,8 @@ contract SetRegistryTest is Test {
         assertTrue(allCompliant);
         assertEq(proofSize, 1024);
         assertEq(provingTimeMs, 500);
+        assertEq(registry.totalCommitments(), 1);
+        assertEq(registry.totalStarkProofs(), 1);
     }
 
     function test_CommitStarkProof() public {
@@ -222,6 +228,8 @@ contract SetRegistryTest is Test {
         assertTrue(registry.hasStarkProof(batchId));
         assertTrue(registry.verifyStarkProofHash(batchId, proofHash));
         assertFalse(registry.verifyStarkProofHash(batchId, keccak256("wrong")));
+        assertEq(registry.totalCommitments(), 1);
+        assertEq(registry.totalStarkProofs(), 1);
     }
 
     function test_CommitStarkProof_InvalidProof() public {
@@ -925,8 +933,8 @@ contract SetRegistryTest is Test {
         );
 
         (commitmentCount, proofCount, isPaused, isStrictMode) = registry.getRegistryStats();
-        // totalCommitments no longer incremented in commitBatch (gas optimization)
-        // commitmentCount is now stale; verify other stats still work
+        assertEq(commitmentCount, 1);
+        assertEq(proofCount, 0);
         assertFalse(isPaused);
     }
 

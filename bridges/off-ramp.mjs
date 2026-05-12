@@ -72,6 +72,8 @@ import { dirname, resolve } from 'node:path';
 const __here = dirname(fileURLToPath(import.meta.url));
 const broadcastLog = process.env.BROADCAST_LOG
   || resolve(__here, '../contracts/broadcast/DeployLocal.s.sol/84532001/run-latest.json');
+const NONCE_DIR = process.env.PAYOUT_NONCE_DIR
+  || resolve(__here, '../stack/.run/payout-nonces');
 
 let _addrs = null;
 function loadAddresses() {
@@ -139,6 +141,86 @@ async function resolveSsdcAmount(amount, currency) {
 // In-memory replay protection. In production this is a database keyed on
 // (seller, nonce) with appropriate retention.
 const usedNonces = new Map();   // seller (lower) → Set<nonce>
+
+function safePathPart(value, field) {
+  if (typeof value !== 'string' || !/^[A-Za-z0-9_.:-]{1,160}$/.test(value)) {
+    throw new Error(`invalid ${field}`);
+  }
+  return value.replace(/[^A-Za-z0-9_.:-]/g, '_');
+}
+
+function nonceFileFor(seller, nonce, dir = NONCE_DIR) {
+  const sellerPart = safePathPart(getAddress(String(seller).toLowerCase()).toLowerCase(), 'seller');
+  const noncePart = safePathPart(String(nonce), 'nonce');
+  return resolve(dir, sellerPart, `${noncePart}.json`);
+}
+
+function readJsonFile(path) {
+  try {
+    return JSON.parse(fs.readFileSync(path, 'utf-8'));
+  } catch {
+    return null;
+  }
+}
+
+function writeJsonAtomic(path, data) {
+  fs.mkdirSync(dirname(path), { recursive: true });
+  const tmp = `${path}.${process.pid}.${Date.now()}.${crypto.randomBytes(4).toString('hex')}.tmp`;
+  try {
+    fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
+    fs.renameSync(tmp, path);
+  } catch (err) {
+    fs.rmSync(tmp, { force: true });
+    throw err;
+  }
+}
+
+export function reservePayoutNonce(seller, nonce, dir = NONCE_DIR) {
+  const file = nonceFileFor(seller, nonce, dir);
+  fs.mkdirSync(dirname(file), { recursive: true });
+  let fd;
+  try {
+    fd = fs.openSync(file, 'wx');
+    fs.writeFileSync(fd, JSON.stringify({
+      seller: getAddress(String(seller).toLowerCase()),
+      nonce,
+      status: 'processing',
+      reservedAt: new Date().toISOString(),
+    }, null, 2));
+    return { reserved: true, file };
+  } catch (err) {
+    if (err.code === 'EEXIST') {
+      return { reserved: false, file, status: readJsonFile(file)?.status || 'unknown' };
+    }
+    throw err;
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
+  }
+}
+
+export function finalizePayoutNonce(seller, nonce, result, dir = NONCE_DIR) {
+  const file = nonceFileFor(seller, nonce, dir);
+  writeJsonAtomic(file, {
+    seller: getAddress(String(seller).toLowerCase()),
+    nonce,
+    status: 'processed',
+    processedAt: new Date().toISOString(),
+    pullTx: result?.pull_tx,
+    pullBlock: result?.pull_block,
+    amountSsdcUnits: result?.pull_amount_ssdc_units,
+  });
+}
+
+export function failPayoutNonce(seller, nonce, err, dir = NONCE_DIR) {
+  const file = nonceFileFor(seller, nonce, dir);
+  writeJsonAtomic(file, {
+    seller: getAddress(String(seller).toLowerCase()),
+    nonce,
+    status: 'failed',
+    failedAt: new Date().toISOString(),
+    error: err?.message || String(err),
+  });
+}
 
 // ─── Compose the canonical payout-request message ────────────────────────
 // Seller signs this exact string. Bridge re-derives + verifies. Any change
@@ -262,49 +344,59 @@ async function handlePayout(body) {
   const { sellerChecked, outputCurrency } = verifyPayoutRequest(body, { chainId: Number(network.chainId) });
   const { amountUsd, nonce, bankLast4 } = body;
 
-  // Convert seller's foreign-amount → SSDC via the on-chain FxOracle. USD
-  // bypasses the oracle (1:1). The auditor can replay this conversion off
-  // the FX quote logged at `updatedAt`.
-  const { ssdcWei: amountUnits, rate, updatedAt } = await resolveSsdcAmount(amountUsd, outputCurrency);
+  const reservation = reservePayoutNonce(sellerChecked, nonce);
+  if (!reservation.reserved) throw new Error('nonce already used');
 
-  // Check balance + allowance
-  const ssdc = getSsdcContract();
-  const balance = await ssdc.balanceOf(sellerChecked);
-  if (balance < amountUnits) {
-    throw new Error(`insufficient SSDC balance: have ${formatUnits(balance, 18)}, need ${formatUnits(amountUnits, 18)}`);
+  try {
+    // Convert seller's foreign-amount → SSDC via the on-chain FxOracle. USD
+    // bypasses the oracle (1:1). The auditor can replay this conversion off
+    // the FX quote logged at `updatedAt`.
+    const { ssdcWei: amountUnits, rate, updatedAt } = await resolveSsdcAmount(amountUsd, outputCurrency);
+
+    // Check balance + allowance
+    const ssdc = getSsdcContract();
+    const balance = await ssdc.balanceOf(sellerChecked);
+    if (balance < amountUnits) {
+      throw new Error(`insufficient SSDC balance: have ${formatUnits(balance, 18)}, need ${formatUnits(amountUnits, 18)}`);
+    }
+    const allowance = await ssdc.allowance(sellerChecked, bridge.address);
+    if (allowance < amountUnits) {
+      throw new Error(
+        `insufficient SSDC allowance: have ${formatUnits(allowance, 18)}, need ${formatUnits(amountUnits, 18)}. ` +
+        `Seller must call ssdc.approve(${bridge.address}, ${amountUnits}) first.`,
+      );
+    }
+
+    // Pull SSDC into the bridge treasury (would be burned on settlement)
+    const tx = await ssdc.transferFrom(sellerChecked, bridge.address, amountUnits, { gasLimit: 200_000n });
+    const rcpt = await tx.wait();
+
+    // Record nonce as used in-process too; the durable file blocks restarts.
+    const seen = usedNonces.get(sellerChecked.toLowerCase()) || new Set();
+    seen.add(nonce);
+    usedNonces.set(sellerChecked.toLowerCase(), seen);
+
+    const result = {
+      pull_tx: rcpt.hash,
+      pull_block: rcpt.blockNumber,
+      pull_amount_ssdc_units: amountUnits.toString(),
+      pull_amount_ssdc: formatUnits(amountUnits, 18),
+      bridge_treasury: bridge.address,
+      fx: outputCurrency === 'USD' ? null : {
+        pair: `${outputCurrency}/ssUSD`,
+        rate: rate?.toString(),
+        quoteUpdatedAt: updatedAt ? Number(updatedAt) : null,
+      },
+      payout: mockOutboundPayment({
+        seller: sellerChecked, amountUsd, bankLast4, txHash: rcpt.hash, outputCurrency,
+      }),
+    };
+    finalizePayoutNonce(sellerChecked, nonce, result);
+    return result;
+  } catch (err) {
+    failPayoutNonce(sellerChecked, nonce, err);
+    throw err;
   }
-  const allowance = await ssdc.allowance(sellerChecked, bridge.address);
-  if (allowance < amountUnits) {
-    throw new Error(
-      `insufficient SSDC allowance: have ${formatUnits(allowance, 18)}, need ${formatUnits(amountUnits, 18)}. ` +
-      `Seller must call ssdc.approve(${bridge.address}, ${amountUnits}) first.`,
-    );
-  }
-
-  // Pull SSDC into the bridge treasury (would be burned on settlement)
-  const tx = await ssdc.transferFrom(sellerChecked, bridge.address, amountUnits, { gasLimit: 200_000n });
-  const rcpt = await tx.wait();
-
-  // Record nonce as used
-  const seen = usedNonces.get(sellerChecked.toLowerCase()) || new Set();
-  seen.add(nonce);
-  usedNonces.set(sellerChecked.toLowerCase(), seen);
-
-  return {
-    pull_tx: rcpt.hash,
-    pull_block: rcpt.blockNumber,
-    pull_amount_ssdc_units: amountUnits.toString(),
-    pull_amount_ssdc: formatUnits(amountUnits, 18),
-    bridge_treasury: bridge.address,
-    fx: outputCurrency === 'USD' ? null : {
-      pair: `${outputCurrency}/ssUSD`,
-      rate: rate?.toString(),
-      quoteUpdatedAt: updatedAt ? Number(updatedAt) : null,
-    },
-    payout: mockOutboundPayment({
-      seller: sellerChecked, amountUsd, bankLast4, txHash: rcpt.hash, outputCurrency,
-    }),
-  };
 }
 
 // ─── HTTP server ─────────────────────────────────────────────────────────

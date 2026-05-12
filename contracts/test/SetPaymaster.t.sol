@@ -316,6 +316,9 @@ contract SetPaymasterTest is Test {
         assertEq(spentToday, sponsorAmount);
         assertEq(spentThisMonth, sponsorAmount);
         assertEq(totalSponsored, sponsorAmount);
+
+        (, uint256 totalSponsoredAll,,) = paymaster.getPaymasterStatus();
+        assertEq(totalSponsoredAll, sponsorAmount);
     }
 
     function test_ExecuteSponsorship_NotOperator() public {

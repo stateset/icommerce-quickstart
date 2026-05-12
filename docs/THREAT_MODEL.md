@@ -93,8 +93,8 @@ These don't cleanly fit STRIDE but matter for an honest evaluation.
 | Seller's wallet is sanctioned mid-order | OFAC screening is off-protocol | The `agent.authorization.v1` STARK policy is the place to enforce; v2 |
 | MEV: a searcher front-runs `release()` to extract from the seller | Release is no-arb; no value to extract by reordering | None |
 | MEV: the FX oracle's update is sandwich-attacked | The quote update + the lock are operator-coordinated; if a buyer's `lock()` lands between two oracle updates, the rate they get is the chain-finalized one | Production: explicit rate-binding via signed quote per-order |
-| Replay an old payout request signature | `usedNonces[seller][nonce]` blocks duplicates; 5-min timestamp tolerance | None |
-| Replay an old Stripe webhook | Stripe sends idempotency keys; bridge currently doesn't dedupe by them | **Production gap** — track event.id in a TTL cache |
+| Replay an old payout request signature | Canonical message binds nonce + timestamp; bridge reserves `(seller, nonce)` before transfer | Production should back the local reservation with a DB unique key |
+| Replay an old Stripe webhook | HMAC timestamp/body binding plus atomic `event.id` reservation before mint | Production should back the local reservation with Redis/Postgres TTL |
 | Buyer and seller collude to launder funds via fake disputes | Dispute resolution requires operator approval | Operator's discretion is the bottleneck; v2 multi-sig |
 | Subscription fork: subscriber stops paying after taking a "free" cycle | Each cycle is independent — escrow only releases for delivered cycles | None |
 | Multi-tier supply chain leg fails mid-flight (manufacturer reneges) | Each leg is independent OrderEscrow; tier-2 refund timeout protects wholesaler | None |

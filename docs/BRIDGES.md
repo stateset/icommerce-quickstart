@@ -30,12 +30,12 @@ STRIPE_WEBHOOK_SECRET=whsec_live_REPLACE_ME_FROM_STRIPE_DASHBOARD
 
 The HMAC verification in `bridge-stripe-to-ssdc.mjs` works unchanged.
 
-#### 2. Idempotency — track event IDs
+#### 2. Idempotency — replace local event files with your production store
 
-Stripe retries webhooks aggressively (up to 3 days). The demo bridge will mint SSDC twice if it processes the same event twice. **Production must dedupe by `event.id`.**
+Stripe retries webhooks aggressively (up to 3 days). The quickstart bridge reserves `event.id` with an atomic local file before minting, so replaying the same processed event does not mint twice on one deployment. In-flight or failed reservations return non-2xx instead of being acknowledged as completed. **Production should move the same reservation to Redis or Postgres** so it survives container reschedules and can be monitored centrally.
 
 ```js
-// Add a Redis (or Postgres unique index) check before handleEvent():
+// Production equivalent of the local file reservation:
 const seen = await redis.set(`stripe:event:${event.id}`, '1', { NX: true, EX: 7 * 86400 });
 if (!seen) return res.status(200).end();   // already processed
 ```
@@ -147,7 +147,7 @@ Field shapes are identical to the mock — same `id`, `amount`, `currency`, `sta
 
 #### 2. Persist nonce usage durably
 
-The demo uses an in-memory `Map`. Production must use a database — a single bridge restart would otherwise let an attacker re-submit a replay.
+The quickstart reserves `(seller, nonce)` with an atomic local file before pulling SSDC, and also keeps an in-process cache for fast duplicate rejection. Production should use a database unique key instead of local files.
 
 ```sql
 CREATE TABLE payout_nonces (

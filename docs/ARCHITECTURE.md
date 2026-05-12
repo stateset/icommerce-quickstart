@@ -89,10 +89,10 @@ Run the entire loop in one command: `./stack/stateset demo realmoney`.
 | **L1** | `FxOracle` | Per-pair quotes with TTL. **7 tests** | `realmoney-loop --currency JPY --payout-currency GBP` |
 | **L1** | `SSDC` + `NAVOracle` | Rebasing T-Bill-backed stablecoin. **27 NAVOracle tests** | every demo (every commerce flow settles in SSDC) |
 | **L1** | `MockSsUSD` | 6dp test ERC-20 | only used by deploy script + tests |
-| **L4** | Stripe bridges (`on-ramp.mjs`, `off-ramp.mjs`) | Node, plain `node:http`; **35 unit tests** standalone | `realmoney-loop` (spawns both as child processes) |
+| **L4** | Stripe bridges (`on-ramp.mjs`, `off-ramp.mjs`) | Node, plain `node:http`; **41 unit tests** standalone | `realmoney-loop` (spawns both as child processes) |
 | **L5** | `stateset` CLI | Bash, 21 subcommands | the operator entry point |
 
-Total: **216 contract tests** + **35 bridge unit tests** + **17 invariant assertions** across 3 e2e CI runs.
+Total: **216 contract tests** + **41 bridge unit tests** + **17 invariant assertions** across 3 e2e CI runs.
 
 ### Referenced (upstream, not bundled here)
 
@@ -160,7 +160,7 @@ Every transition is either an on-chain transaction (verifiable via `cast`/RPC) o
 | Failure | Detection | Response |
 |---------|-----------|----------|
 | Buyer's card chargeback after Stripe webhook | Off-protocol — Stripe handles via dispute API | Burn equivalent SSDC out of buyer wallet (hard — requires balance freeze; current design treats this as residual risk to be handled at the bridge layer) |
-| Stripe webhook signature replay | `verifyStripeSignature` 5-min timestamp tolerance + body-binding | Bridge rejects with 400 |
+| Stripe webhook replay | `verifyStripeSignature` 5-min timestamp tolerance + body-binding, then atomic `event.id` reservation before mint | Processed duplicate returns 200 without minting; in-flight/failed reservations stay non-2xx; production should back reservation with Redis/Postgres |
 | Bridge operator key compromise | Mint privilege limited to one address; rotate via SSDC.setTreasuryVault | Multi-sig the treasury wallet in production |
 | Seller pulls funds twice via different orders | `OrderEscrow.totalLocked` accounting per-token; `release()` decrements | Math is checked; balance can't double-spend |
 | Buyer fakes a delivery receipt to grab funds | `markDelivered` is buyer-only; `release()` requires status==Delivered | Buyer attesting delivery is the prerequisite — no off-platform proof needed |

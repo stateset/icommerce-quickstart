@@ -259,7 +259,7 @@ EOF
       echo -e "    ${D}totalSupply${X}     $(cast --to-unit "$total" 18 2>/dev/null || echo '?') SSDC"
     fi
     if [ -n "$nav" ]; then
-      navper=$(cast call "$nav" "currentNavPerShare()(uint256)" --rpc-url "$RPC" 2>/dev/null | head -1)
+      navper=$(cast call "$nav" "getCurrentNAVPerShare()(uint256)" --rpc-url "$RPC" 2>/dev/null | head -1)
       echo -e "  ${C}NAVOracle${X}         $nav"
       echo -e "    ${D}NAV/share${X}       \$$(cast --to-unit "$navper" 18 2>/dev/null || echo '?')"
     fi
@@ -458,11 +458,17 @@ EOF
     else bad "forge test failed"; failed=$((failed+1)); fi
 
     info "[4/5] bridges: npm test"
-    if (cd "$ROOT/bridges" && [ -d node_modules ] || npm install --silent 2>&1 | tail -1 >/dev/null; npm test 2>&1 | grep -qE "^# pass [0-9]+|^ℹ pass [0-9]+"); then ok "bridges npm test passed"
-    else bad "bridges npm test failed"; failed=$((failed+1)); fi
+    bridge_log="$PIDDIR/gates-bridges.log"
+    if (cd "$ROOT/bridges" && { [ -d node_modules ] || npm install --silent; } && npm test >"$bridge_log" 2>&1); then
+      ok "bridges npm test passed"
+    else
+      bad "bridges npm test failed"
+      tail -12 "$bridge_log" 2>/dev/null || true
+      failed=$((failed+1))
+    fi
 
     info "[5/5] demos: syntax + validate-fixture"
-    if (cd "$ROOT/demos" && [ -d node_modules ] || npm install --silent 2>&1 | tail -1 >/dev/null; \
+    if (cd "$ROOT/demos" && { [ -d node_modules ] || npm install --silent; } && \
         node --check escrow-lifecycle.mjs && \
         node --check realmoney-loop.mjs && \
         node --check verify-receipt.mjs && \
