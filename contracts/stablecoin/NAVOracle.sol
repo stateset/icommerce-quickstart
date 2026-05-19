@@ -214,7 +214,13 @@ contract NAVOracle is INAVOracle, Initializable, OwnableUpgradeable, UUPSUpgrade
             revert AlreadyAttested();
         }
 
-        // Check if there's an existing pending attestation that expired
+        // Why reject "different pending attestation in progress" instead of
+        // letting multiple co-exist: the attestation pool would otherwise be
+        // a DoS vector — an attestor could spam disjoint (totalAssets,
+        // reportDate, proofHash) tuples and exhaust threshold-coverage on
+        // each. One pending at a time means progress is sequential and
+        // observable; expired pendings get auto-cleared here on the next
+        // attestation attempt.
         if (currentPendingKey != bytes32(0) && currentPendingKey != attestationKey) {
             PendingAttestation storage existing = pendingAttestations[currentPendingKey];
             if (block.timestamp > existing.createdAt + pendingAttestationExpiry) {
@@ -288,7 +294,11 @@ contract NAVOracle is INAVOracle, Initializable, OwnableUpgradeable, UUPSUpgrade
             newNavPerShare = (totalAssets * PRECISION) / totalShares;
         }
 
-        // Validate NAV change is within limits (only after initial attestation)
+        // Why a per-attestation cap on NAV change: a compromised attestor (or
+        // a fat-finger) that posts a 10x NAV would mass-mint by the next
+        // SSDC rebase. Capping at `maxNavChangeBps` (default 5%) bounds the
+        // blast radius of a single bad attestation; recovery is a sequence
+        // of corrected attestations rather than an emergency pause.
         if (_currentNAV.totalAssets > 0 && totalShares > 0) {
             uint256 previousNav = _currentNAV.navPerShare;
             uint256 maxChange = (previousNav * maxNavChangeBps) / BPS_DENOMINATOR;
@@ -296,8 +306,10 @@ contract NAVOracle is INAVOracle, Initializable, OwnableUpgradeable, UUPSUpgrade
             if (newNavPerShare > previousNav + maxChange) {
                 revert NAVChangeExceedsLimit();
             }
-            // NAV should not decrease for T-Bills (principal protected)
-            // But allow small decreases for fees
+            // Why a much tighter floor (100 bps = 1%) than the ceiling: T-Bills
+            // are principal-protected, so the only legitimate NAV decrease is
+            // fee accrual or a *very* small mark-to-market on bond duration.
+            // A larger drop is a stronger smell than a comparable gain.
             if (newNavPerShare < previousNav - (previousNav * 100 / BPS_DENOMINATOR)) {
                 revert NAVChangeExceedsLimit();
             }
@@ -449,7 +461,12 @@ contract NAVOracle is INAVOracle, Initializable, OwnableUpgradeable, UUPSUpgrade
             attestorCount++;
         } else if (!authorized && wasAuthorized) {
             attestorCount--;
-            // Ensure threshold doesn't exceed attestor count
+            // Why auto-clamp threshold when attestors drop: if owner revokes
+            // an attestor while `threshold > new attestorCount`, NAV
+            // attestation would become unreachable until the owner manually
+            // lowered the threshold. Clamping keeps the oracle live during
+            // attestor rotation; the owner can still raise the threshold
+            // back up explicitly via setAttestationThreshold.
             if (attestationThreshold > attestorCount && attestorCount > 0) {
                 uint256 oldThreshold = attestationThreshold;
                 attestationThreshold = attestorCount;

@@ -4,6 +4,48 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-05-19
+
+The "A+ pass" release. Closes the four residual-risk items the v0.7.x threat model flagged as pre-mainnet blockers, populates the previously empty `.agents/` + `.codex/` directories, and adds the demo path for on-chain STARK verification once an upstream verifier exists.
+
+### Added — bridge hardening (closes THREAT_MODEL.md #3 "Bridge layer has no rate limits")
+- **`bridges/lib/limits.mjs`** — `createDailyCap` (sliding 24h USD-equivalent volume cap) + `createRateLimiter` (per-source 60s sliding window) + durable replay loaders (`loadOnRampRecords`, `loadOffRampRecords`) so a process restart preserves the 24h window from the existing idempotency directories. Plus `clientIdFromRequest` with explicit `BRIDGE_TRUST_PROXY` opt-in so spoofed `X-Forwarded-For` can't rotate-bypass the per-IP gate.
+- **On-ramp** now refuses webhooks past `MAX_DAILY_MINT_USD` (default 100,000 ssUSD/24h) and `WEBHOOK_RATE_LIMIT_PER_MIN` (default 120 req/min) with HTTP 429 + `Retry-After`. Cap check sits after FX conversion so the gate is on actual ssUSD volume, not foreign-currency face value. Cap state is recorded only on chain-confirmed success.
+- **Off-ramp** gets the symmetric pair: `MAX_DAILY_PAYOUT_USD` (default 100,000) + `PAYOUT_RATE_LIMIT_PER_MIN` (default 60). Cap meters ssUSD *leaving* the system, computed off the resolved SSDC amount so non-USD payout legs are accounted in dollar-equivalent units.
+- Both bridges expose limits state on `GET /health` (`limits.maxDailyMintUsd`, `limits.usedLast24h`, `limits.rateLimitPerMin`) so operators can monitor headroom without parsing logs.
+- **18 new bridge tests** in `tests/limits.test.mjs` cover: cap admit/refuse/rolloff, malformed-config rejection, restart-from-disk seeding, rate-limit per-source independence, window rollover, and `clientIdFromRequest` proxy-trust semantics.
+
+### Added — multi-sig operator path (closes THREAT_MODEL.md #2 "Operator role is single-key")
+- **`contracts/commerce/MultisigGuard.sol`** — minimal `m-of-n` multisig that executes arbitrary `(target, value, data)` calls once `threshold` owner signatures cover the canonical `(chainId, this, target, value, data, nonce)` hash. Strictly-ascending signer-address ordering provides O(n) dedup without an extra seen-set. Nonce increments *before* the external call to neutralize a re-entry replay.
+- **17 Foundry tests** in `test/MultisigGuard.t.sol`: constructor rejects (empty / >32 / zero-addr / dup / threshold=0 / threshold>owners), happy-path 2-of-3 and 3-of-3, every rejection path (insufficient sigs, non-owner sig, duplicate sig, out-of-order sig), nonce-bump replay protection, cross-deployment isolation (same sigs on a sibling guard revert), and target-revert bubbling.
+- **`demos/multisig-operator.mjs`** — end-to-end demo: deploys a 2-of-3 `MultisigGuard`, transfers `SSDC.treasuryVault` to it, then proves the single-key bypass is gone (direct mint reverts), threshold is enforced (1 sig reverts), and a 2-sig submission mints to a fresh wallet. Prints the canonical `callHash` so a third-party auditor can re-derive it.
+- `OrderEscrow.operator` + `FxOracle.operator` are still `immutable` (by design — owner rotation is its own meta-governance surface); the demo documents the one-line `DeployLocal` change to pass the guard at construction for production deploys.
+
+### Added — on-chain receipt verification demo (closes THREAT_MODEL.md #1 partial)
+- **`demos/verify-onchain.mjs`** — receipt → `SetRegistry.verifyStarkProofHash` cross-check + optional upstream STARK verifier call via `STARK_VERIFIER_ADDRESS`. Falls back gracefully when the verifier address is unset (prints the exact `cast` invocation and exits 0). With the address set, it ABI-encodes the public inputs (`policyHash`, `allCompliant`, `policyLimit`) and asserts the verifier returns true. Closes the doc-only "off-chain handshake" half of the proof-validation gap.
+
+### Added — agent specs (closes the empty `.agents/` + `.codex/` placeholders)
+- **`.agents/`** — five harness-neutral markdown prompts: `gate-runner`, `release-prep`, `security-reviewer`, `bridge-debugger`, `onchain-auditor`. Each is a self-contained runbook with explicit commands + a fixed report shape; drop into Claude Code, Codex CLI, Cursor, or any agentic harness.
+- **`.codex/`** — `config.toml` + `AGENTS.md` + `README.md` for OpenAI Codex CLI. Pre-configures approval mode, preferred model, and suggested commands matching the `stack/stateset` orchestrator.
+
+### Added — Solidity `Why:` comments on dense logic
+- **`SetRegistry.sol`** — strict-mode state-root chaining + sequence-continuity rationale; bitwise-Merkle-walk gas justification; unchecked-loop safety argument.
+- **`SetPaymentBatch.sol`** — daily-volume reset edge behavior, low-level-call vs SafeERC20 rationale (per-payment soft-fail), USDT-shaped non-reverting-transfer handling, Merkle-tree ordering invariant.
+- **`NAVOracle.sol`** — per-attestation NAV-change cap rationale (blast-radius bound), asymmetric floor vs ceiling (T-Bill principal protection), pending-attestation-singleton DoS rationale, attestor-revocation threshold auto-clamp rationale.
+
+### Changed
+- **`stack/stateset`** — `demo` subcommand and shell completion now expose the two new demos (`multisig`, `verify-onchain`). `gates` and `test` syntax-check them.
+- **README** — releases table, "What's in the box" demos list (3 → 5), test counts (216 → 233 contracts, 50 → 68 bridges), CLI demo line.
+- **`docs/THREAT_MODEL.md`** — STRIDE rows for "bridge operator key compromise" and "Stripe webhook flood" now cite `bridges/lib/limits.mjs`. The "Operator mints unlimited SSDC" row now cites `MultisigGuard`. Residual-risk numbered list rewritten — items #1, #2, #3 are now partial-or-closed with explicit pointers to the new code.
+- **`bridges/README.md`** — env table gains five new variables (`MAX_DAILY_MINT_USD`, `MAX_DAILY_PAYOUT_USD`, `WEBHOOK_RATE_LIMIT_PER_MIN`, `PAYOUT_RATE_LIMIT_PER_MIN`, `BRIDGE_TRUST_PROXY`); new "Limits" section documents the `GET /health` shape and the restart-durability semantics.
+
+### Verified
+- 5/5 non-chain gates green via `./stack/stateset gates`.
+- 233/233 contract tests green (was 216; +17 for `MultisigGuardTest`).
+- 68/68 bridge unit tests green (was 50; +18 for `limits.test.mjs`).
+- `demos/multisig-operator.mjs` runs end-to-end against a fresh anvil: transferred treasury, refused single-sig, accepted 2-of-3, callHash audit shape verified.
+- `demos/verify-onchain.mjs` offline path runs against bundled fixture without errors; produces the exact `cast` command needed to enable the upstream verifier round-trip.
+
 ## [0.7.4] — 2026-05-12
 
 The "config fail-closed" patch. v0.7.4 makes bridge startup reject unsafe numeric environment configuration instead of silently accepting it.

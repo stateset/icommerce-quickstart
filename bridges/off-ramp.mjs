@@ -50,12 +50,24 @@ export function readPositiveIntegerEnv(name, fallback, source = process.env, opt
   return value;
 }
 
+import {
+  createDailyCap,
+  createRateLimiter,
+  loadOffRampRecords,
+  clientIdFromRequest,
+} from './lib/limits.mjs';
+
 const PORT = readPositiveIntegerEnv('PORT', 4243, process.env, { max: 65535 });
 const RPC_URL = process.env.RPC_URL || 'http://localhost:8545';
 const REQUEST_TTL_SECS = 5 * 60;  // signed payout requests expire in 5 minutes
 const MIN_PAYOUT_USD = 1;
 const MAX_PAYOUT_USD = 1_000_000;
 const MAX_PAYOUT_BYTES = readPositiveIntegerEnv('MAX_PAYOUT_BYTES', 1024 * 1024);
+// Matches the on-ramp's cap intent. Off-ramp cap meters ssUSD *leaving* the
+// stack to fiat — pairs with on-ramp cap to bound net 24h flow in either dir.
+const MAX_DAILY_PAYOUT_USD = readPositiveIntegerEnv('MAX_DAILY_PAYOUT_USD', 100_000);
+const PAYOUT_RATE_LIMIT_PER_MIN = readPositiveIntegerEnv('PAYOUT_RATE_LIMIT_PER_MIN', 60);
+const BRIDGE_TRUST_PROXY = process.env.BRIDGE_TRUST_PROXY === '1';
 
 // Symmetric to the on-ramp: same five currencies. Each ISO code maps to a
 // symbol used in the canonical message and a `minorUnits` factor used by the
@@ -140,6 +152,22 @@ const BRIDGE_TREASURY_KEY = process.env.BRIDGE_TREASURY_KEY
 
 const provider = new JsonRpcProvider(RPC_URL);
 const bridge = new Wallet(BRIDGE_TREASURY_KEY, provider);
+
+// Daily payout cap + per-IP rate limiter. Seeds from the durable nonce-store
+// so a process restart preserves the 24h window.
+export const dailyPayoutCap = createDailyCap({
+  maxUsd: MAX_DAILY_PAYOUT_USD,
+  initialRecords: loadOffRampRecords(NONCE_DIR),
+});
+export const payoutRateLimiter = createRateLimiter({ maxPerMinute: PAYOUT_RATE_LIMIT_PER_MIN });
+
+export class DailyPayoutCapExceeded extends Error {
+  constructor(decision) {
+    super(`daily payout cap reached: ${decision.used.toFixed(2)} / ${decision.maxUsd} ssUSD used in last 24h`);
+    this.name = 'DailyPayoutCapExceeded';
+    this.decision = decision;
+  }
+}
 
 const SSDC_ABI = [
   'function balanceOf(address) view returns (uint256)',
@@ -415,9 +443,18 @@ async function handlePayout(body) {
       );
     }
 
+    // ssUSD-denominated cap check. Pre-mint headroom may have changed since
+    // request admission (concurrent payouts), so re-check inside the async path.
+    // Why convert via the resolved SSDC amount, not amountUsd: that's the value
+    // actually leaving the system; for non-USD legs the foreign amount diverges.
+    const amountSsdcUsd = Number(formatUnits(amountUnits, 18));
+    const capDecision = dailyPayoutCap.check(amountSsdcUsd);
+    if (!capDecision.allowed) throw new DailyPayoutCapExceeded(capDecision);
+
     // Pull SSDC into the bridge treasury (would be burned on settlement)
     const tx = await ssdc.transferFrom(sellerChecked, bridge.address, amountUnits, { gasLimit: 200_000n });
     const rcpt = await tx.wait();
+    dailyPayoutCap.record(amountSsdcUsd);
 
     // Record nonce as used in-process too; the durable file blocks restarts.
     const seen = usedNonces.get(sellerChecked.toLowerCase()) || new Set();
@@ -462,6 +499,11 @@ const server = http.createServer(async (req, res) => {
       fxOracle: a.fxOracleAddr || null,
       bridge_treasury: bridge.address,
       supported_currencies: Object.keys(SUPPORTED_OUTPUT_CURRENCIES),
+      limits: {
+        maxDailyPayoutUsd: MAX_DAILY_PAYOUT_USD,
+        usedLast24h: dailyPayoutCap.used(),
+        rateLimitPerMin: PAYOUT_RATE_LIMIT_PER_MIN,
+      },
       message_template: payoutMessage({
         seller: '0x…', amountUsd: 1, bankLast4: '0000', nonce: 'YOUR_NONCE', issuedAt: 0, chainId: 0,
       }),
@@ -473,6 +515,22 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method !== 'POST' || req.url !== '/payout') {
     return send(404, { error: 'POST /payout or GET /health' });
+  }
+
+  // Rate limit BEFORE body drain + signature recovery. Signature verification is
+  // the expensive work on this path; gate by source first.
+  const clientId = clientIdFromRequest(req, { trustProxy: BRIDGE_TRUST_PROXY });
+  const rateDecision = payoutRateLimiter.check(clientId);
+  if (!rateDecision.allowed) {
+    res.writeHead(429, {
+      'Content-Type': 'application/json',
+      'Retry-After': String(rateDecision.retryAfter),
+    });
+    res.end(JSON.stringify({
+      error: `rate limit: ${rateDecision.count}/${rateDecision.maxPerMinute} per minute from ${clientId}`,
+      retryAfter: rateDecision.retryAfter,
+    }));
+    return;
   }
 
   let raw = '';
@@ -502,7 +560,12 @@ const server = http.createServer(async (req, res) => {
       send(200, result);
     } catch (err) {
       console.error(`  ✗ ${err.message}`);
-      send(400, { error: err.message });
+      if (err instanceof DailyPayoutCapExceeded) {
+        res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' });
+        res.end(JSON.stringify({ error: err.message, dailyCap: err.decision }));
+      } else {
+        send(400, { error: err.message });
+      }
     }
   });
 });
@@ -517,6 +580,8 @@ if (isMain) {
     console.log(`  RPC                ${RPC_URL}`);
     console.log(`  SSDC               ${a.ssdcProxy}`);
     console.log(`  bridge treasury    ${bridge.address}`);
+    console.log(`  daily cap          ${MAX_DAILY_PAYOUT_USD} ssUSD/24h (used ${dailyPayoutCap.used().toFixed(2)} on startup)`);
+    console.log(`  rate limit         ${PAYOUT_RATE_LIMIT_PER_MIN} req/min per source${BRIDGE_TRUST_PROXY ? ' (X-Forwarded-For trusted)' : ''}`);
     console.log(`\n  POST /payout       signed withdrawal request → SSDC pulled, payout queued`);
     console.log(`  GET  /health       bridge state + signing message template\n`);
   });

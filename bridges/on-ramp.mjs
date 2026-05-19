@@ -47,11 +47,25 @@ export function readPositiveIntegerEnv(name, fallback, source = process.env, opt
   return value;
 }
 
+import {
+  createDailyCap,
+  createRateLimiter,
+  loadOnRampRecords,
+  clientIdFromRequest,
+} from './lib/limits.mjs';
+
 const PORT = readPositiveIntegerEnv('PORT', 4242, process.env, { max: 65535 });
 const RPC_URL = process.env.RPC_URL || 'http://localhost:8545';
 const SECRET = process.env.STRIPE_WEBHOOK_SECRET || 'whsec_test_local_only';
 const SIGNING_TOLERANCE = 5 * 60; // seconds — same as Stripe's default
 const MAX_WEBHOOK_BYTES = readPositiveIntegerEnv('MAX_WEBHOOK_BYTES', 1024 * 1024);
+// Why fail-closed defaults: THREAT_MODEL flagged "no per-day mint ceiling" as a
+// pre-mainnet blocker. 100k ssUSD/24h is a demo-friendly ceiling that still
+// trips fast enough to be observable on a single replay flood; production
+// operators override this via env to match their treasury-key risk budget.
+const MAX_DAILY_MINT_USD = readPositiveIntegerEnv('MAX_DAILY_MINT_USD', 100_000);
+const WEBHOOK_RATE_LIMIT_PER_MIN = readPositiveIntegerEnv('WEBHOOK_RATE_LIMIT_PER_MIN', 120);
+const BRIDGE_TRUST_PROXY = process.env.BRIDGE_TRUST_PROXY === '1';
 
 // ─── Locate the deployed contracts ────────────────────────────────────────
 // Read from the repo's own broadcast log produced by `forge script DeployLocal`.
@@ -107,6 +121,15 @@ const TREASURY_KEY = process.env.TREASURY_KEY
 
 const provider = new JsonRpcProvider(RPC_URL);
 const treasury = new Wallet(TREASURY_KEY, provider);
+
+// Daily mint cap + per-IP rate limiter. The cap seeds itself from the durable
+// idempotency directory so a restart doesn't reset the 24h window — without
+// this, an operator restart would silently re-open the budget.
+export const dailyCap = createDailyCap({
+  maxUsd: MAX_DAILY_MINT_USD,
+  initialRecords: loadOnRampRecords(IDEMPOTENCY_DIR),
+});
+export const webhookRateLimiter = createRateLimiter({ maxPerMinute: WEBHOOK_RATE_LIMIT_PER_MIN });
 
 const SSDC_ABI = [
   'function balanceOf(address) view returns (uint256)',
@@ -248,6 +271,16 @@ export function failStripeEvent(eventId, err, dir = IDEMPOTENCY_DIR) {
   });
 }
 
+// Marker error so the HTTP layer can convert it into a 429 (Too Many Requests)
+// while every other thrown error stays a 400.
+export class DailyCapExceeded extends Error {
+  constructor(decision) {
+    super(`daily mint cap reached: ${decision.used.toFixed(2)} / ${decision.maxUsd} ssUSD used in last 24h`);
+    this.name = 'DailyCapExceeded';
+    this.decision = decision;
+  }
+}
+
 // ─── Event handler: mint SSDC when a checkout completes ──────────────────
 async function handleEvent(event) {
   if (event.type !== 'checkout.session.completed') {
@@ -293,6 +326,13 @@ async function handleEvent(event) {
     fxUpdatedAt = Number(updatedAt);
   }
 
+  // Why check *here*, after FX conversion but before mint: the cap is in
+  // USD-equivalent ssUSD, so non-USD legs need their converted amount before
+  // we can decide. Re-check after async FX work because a concurrent webhook
+  // could have consumed headroom between request-admission and now.
+  const capDecision = dailyCap.check(amountSsUsd);
+  if (!capDecision.allowed) throw new DailyCapExceeded(capDecision);
+
   const minLog = currency === 'USD'
     ? `${amountSsUsd.toFixed(2)} SSDC`
     : `${amountForeign.toLocaleString()} ${currency} → ${amountSsUsd.toFixed(2)} SSDC (rate ${fxRate})`;
@@ -301,6 +341,10 @@ async function handleEvent(event) {
   const tx = await ssdc.mintShares(checksumAddr, sharesToMint, { gasLimit: 200_000n });
   const rcpt = await tx.wait();
   const balance = await ssdc.balanceOf(checksumAddr);
+
+  // Only record on chain-confirmed success. A failed tx leaves no cap impact,
+  // which matches the failStripeEvent / 4xx response semantics on the same path.
+  dailyCap.record(amountSsUsd);
 
   return {
     handled: true,
@@ -314,6 +358,10 @@ async function handleEvent(event) {
     txHash: rcpt.hash,
     block: rcpt.blockNumber,
     walletBalance: formatUnits(balance, 18),
+    dailyCap: {
+      usedLast24h: dailyCap.used(),
+      maxUsd: capDecision.maxUsd,
+    },
   };
 }
 
@@ -322,12 +370,38 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && req.url === '/health') {
     const a = loadAddresses();
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, ssdc: a.ssdcProxy, escrow: a.escrowAddr, treasury: treasury.address }));
+    res.end(JSON.stringify({
+      ok: true,
+      ssdc: a.ssdcProxy,
+      escrow: a.escrowAddr,
+      treasury: treasury.address,
+      limits: {
+        maxDailyMintUsd: MAX_DAILY_MINT_USD,
+        usedLast24h: dailyCap.used(),
+        rateLimitPerMin: WEBHOOK_RATE_LIMIT_PER_MIN,
+      },
+    }));
     return;
   }
 
   if (req.method !== 'POST' || req.url !== '/webhook') {
     res.writeHead(404).end();
+    return;
+  }
+
+  // Rate limit BEFORE body drain + HMAC. A signature-flood attacker who lacks
+  // the webhook secret still triggers HMAC work per request without this gate.
+  const clientId = clientIdFromRequest(req, { trustProxy: BRIDGE_TRUST_PROXY });
+  const rateDecision = webhookRateLimiter.check(clientId);
+  if (!rateDecision.allowed) {
+    res.writeHead(429, {
+      'Content-Type': 'application/json',
+      'Retry-After': String(rateDecision.retryAfter),
+    });
+    res.end(JSON.stringify({
+      error: `rate limit: ${rateDecision.count}/${rateDecision.maxPerMinute} per minute from ${clientId}`,
+      retryAfter: rateDecision.retryAfter,
+    }));
     return;
   }
 
@@ -383,8 +457,15 @@ const server = http.createServer(async (req, res) => {
     } catch (err) {
       if (reserved?.reserved && reservedEventId) failStripeEvent(reservedEventId, err);
       console.error(`  ✗ ${err.message}`);
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: err.message }));
+      // Map cap-exhaustion to 429 so Stripe retries with backoff rather than
+      // treating this as a permanent failure; every other error stays a 400.
+      if (err instanceof DailyCapExceeded) {
+        res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' });
+        res.end(JSON.stringify({ error: err.message, dailyCap: err.decision }));
+      } else {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message }));
+      }
     }
   });
 });
@@ -400,6 +481,8 @@ if (isMain) {
     console.log(`  RPC             ${RPC_URL}`);
     console.log(`  SSDC            ${a.ssdcProxy}`);
     console.log(`  treasury        ${treasury.address}`);
+    console.log(`  daily cap       ${MAX_DAILY_MINT_USD} ssUSD/24h (used ${dailyCap.used().toFixed(2)} on startup)`);
+    console.log(`  rate limit      ${WEBHOOK_RATE_LIMIT_PER_MIN} req/min per source${BRIDGE_TRUST_PROXY ? ' (X-Forwarded-For trusted)' : ''}`);
     console.log(`\n  POST /webhook   accepts Stripe-Signature-headers`);
     console.log(`  GET  /health    bridge state\n`);
   });

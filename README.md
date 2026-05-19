@@ -44,7 +44,8 @@ That's it. You now have a working StateSet iCommerce stack on your machine.
 
 | Tag | Date | Headline |
 |---|---|---|
-| **[v0.7.4](https://github.com/stateset/icommerce-quickstart/releases/tag/v0.7.4)** | 2026-05-12 | Config fail-closed — validated bridge env caps and ports |
+| **[v0.8.0](https://github.com/stateset/icommerce-quickstart/releases/tag/v0.8.0)** | 2026-05-19 | A+ pass — bridge caps + rate limits, MultisigGuard, on-chain verify demo, agent specs |
+| [v0.7.4](https://github.com/stateset/icommerce-quickstart/releases/tag/v0.7.4) | 2026-05-12 | Config fail-closed — validated bridge env caps and ports |
 | **[v0.7.3](https://github.com/stateset/icommerce-quickstart/releases/tag/v0.7.3)** | 2026-05-12 | Bridge edge hardening — request caps, exact amounts, Stripe signature rotation |
 | **[v0.7.2](https://github.com/stateset/icommerce-quickstart/releases/tag/v0.7.2)** | 2026-05-12 | A+ hardening — bridge replay guards, truthful stats, fixed gates |
 | **[v0.7.1](https://github.com/stateset/icommerce-quickstart/releases/tag/v0.7.1)** | 2026-05-07 | Stop drifting — 22 doc fixes, doctor checks FX freshness per pair |
@@ -62,9 +63,9 @@ That's it. You now have a working StateSet iCommerce stack on your machine.
 
 | Directory | Contents |
 |---|---|
-| **[`contracts/`](./contracts)** | The 6 Solidity contracts (OrderEscrow, FxOracle, SetRegistry, SSDC, NAVOracle, SetPaymaster) + Foundry config + **216 tests** + deploy scripts |
-| **[`bridges/`](./bridges)** | Fiat ↔ SSDC bridges. Stripe webhook on-ramp + Stripe Treasury off-ramp. **50 unit tests pass standalone** (no chain required). Multi-currency: USD/EUR/GBP/JPY/MXN |
-| **[`demos/`](./demos)** | Three runnable demos:<br>• **`escrow-lifecycle`** — buyer locks, seller delivers, buyer releases (no sequencer, no STARK — just escrow)<br>• **`realmoney-loop`** — full fiat→SSDC→escrow→SSDC→fiat cycle, multi-currency<br>• **`verify-receipt`** — independent audit of any receipt |
+| **[`contracts/`](./contracts)** | The 7 Solidity contracts (OrderEscrow, FxOracle, SetRegistry, SSDC, NAVOracle, SetPaymaster, SetPaymentBatch) + the v0.8.0 `MultisigGuard` operator primitive + Foundry config + **233 tests** + deploy scripts |
+| **[`bridges/`](./bridges)** | Fiat ↔ SSDC bridges. Stripe webhook on-ramp + Stripe Treasury off-ramp. **68 unit tests pass standalone** (no chain required). Multi-currency: USD/EUR/GBP/JPY/MXN. v0.8.0 adds sliding 24h volume caps + per-source rate limits |
+| **[`demos/`](./demos)** | Five runnable demos:<br>• **`escrow-lifecycle`** — buyer locks, seller delivers, buyer releases (no sequencer, no STARK — just escrow)<br>• **`realmoney-loop`** — full fiat→SSDC→escrow→SSDC→fiat cycle, multi-currency<br>• **`verify-receipt`** — independent audit of any receipt<br>• **`multisig-operator`** — proves the single-key SSDC.treasuryVault path is closed via a 2-of-3 `MultisigGuard` (new in v0.8.0)<br>• **`verify-onchain`** — receipt → SetRegistry commitment check + optional upstream STARK verifier call (new in v0.8.0) |
 | **[`schemas/`](./schemas)** | The 3 JSON Schemas: agent-receipt.v1, compliance-bundle.v1, cross-border-receipt.v1 |
 | **[`stack/`](./stack)** | First-time `setup.sh` + the `stateset` CLI orchestrator (21 subcommands; see [CLI reference](#cli-reference)) |
 | **[`docs/`](./docs)** | ARCHITECTURE, BRIDGES, THREAT_MODEL, DEPLOY_SEPOLIA, EXAMPLE_RUN |
@@ -139,8 +140,8 @@ CI runs four kinds of tests on every push:
 
 | Layer | What | Count |
 |---|---|---|
-| **`forge test`** in `contracts/` | OrderEscrow, FxOracle, NAVOracle, SetRegistry, SetPaymaster, SetPaymentBatch | **216** |
-| **`npm test`** in `bridges/` | HMAC, secp256k1, replay rejection, multi-currency, lazy-load | **35** |
+| **`forge test`** in `contracts/` | OrderEscrow, FxOracle, NAVOracle, SetRegistry, SetPaymaster, SetPaymentBatch, MultisigGuard | **233** |
+| **`npm test`** in `bridges/` | HMAC, secp256k1, replay rejection, multi-currency, lazy-load, daily caps + rate limits | **68** |
 | **schema validation** (`validate-fixture.mjs`) | bundled fixture against `agent-receipt.v1.schema.json` | **1** |
 | **e2e demos** (`escrow-lifecycle` + `realmoney-loop` USD + JPY→GBP) | full multi-process cycle with **17 invariant assertions** across 3 runs | **3 runs** |
 
@@ -183,7 +184,7 @@ stateset bridges                start both bridges in the background
 stateset bridges:stop           stop them
 
 # Demos
-stateset demo <name>            lifecycle | realmoney | verify
+stateset demo <name>            lifecycle | realmoney | verify | multisig | verify-onchain
 stateset audit [path]           verify-receipt against any *.json (default: bundled fixture)
 stateset receipts               list every receipt-shaped JSON in the repo
 

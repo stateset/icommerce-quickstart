@@ -7,7 +7,7 @@
   "scripts": {
     "start:on-ramp": "node on-ramp.mjs",
     "start:off-ramp": "node off-ramp.mjs",
-    "test": "node --test tests/on-ramp.test.mjs tests/off-ramp.test.mjs"
+    "test": "node --test tests/on-ramp.test.mjs tests/off-ramp.test.mjs tests/limits.test.mjs"
   },
   "dependencies": {
     "ethers": "^6.16.0"

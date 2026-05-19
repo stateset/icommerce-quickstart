@@ -1,0 +1,51 @@
+# OpenAI Codex CLI — project config
+#
+# Loaded when `codex` is invoked from this repo. Mirrors the bash-friendly
+# defaults the stack/stateset CLI assumes:
+#
+#   • Approval mode: on-request (sensitive ops like deploy, release, force-push
+#                    must explicitly ask) — keeps the user in the loop without
+#                    blocking on every read.
+#   • Model: gpt-5-codex by default; swap via `codex --model …` for a one-off.
+#   • Project doc: AGENTS.md sits next to this file and is auto-loaded.
+#
+# Operator-only overrides (API keys, etc.) belong in ~/.codex/config.toml,
+# never here.
+
+[profile]
+name = "icommerce-quickstart"
+description = "StateSet iCommerce — local protocol stack"
+
+[approval]
+# Sensible default for this repo: Codex can read freely, but every write +
+# every shell command that mutates state asks. Releases, forge deploys, and
+# bridge restarts will always prompt.
+mode = "on-request"
+
+[model]
+# Quickstart works well on Codex's default model; tighter reasoning helps on
+# the Solidity diffs (commits/proofs/state-root continuity).
+preferred = "gpt-5-codex"
+
+[shell]
+# Hint Codex toward the project orchestrator instead of reinventing flows.
+suggest_commands = [
+  "./stack/stateset up",
+  "./stack/stateset gates",
+  "./stack/stateset test",
+  "./stack/stateset doctor --fix",
+  "./stack/stateset demo lifecycle",
+  "./stack/stateset demo realmoney",
+  "./stack/stateset demo multisig",
+  "./stack/stateset demo verify-onchain",
+]
+
+[refs]
+# Files the agent should re-read at the start of each Codex session.
+context = [
+  "AGENTS.md",
+  "../README.md",
+  "../docs/THREAT_MODEL.md",
+  "../docs/ARCHITECTURE.md",
+  "../CHANGELOG.md",
+]

@@ -108,7 +108,7 @@ _stateset_completions() {
   if [ "$COMP_CWORD" = 1 ]; then
     COMPREPLY=( $(compgen -W "$subs" -- "$cur") )
   elif [ "$prev" = "demo" ]; then
-    COMPREPLY=( $(compgen -W "lifecycle realmoney verify" -- "$cur") )
+    COMPREPLY=( $(compgen -W "lifecycle realmoney verify multisig verify-onchain" -- "$cur") )
   elif [ "$prev" = "completion" ]; then
     COMPREPLY=( $(compgen -W "bash zsh" -- "$cur") )
   elif [ "$prev" = "audit" ] || [ "$prev" = "demo verify" ]; then
@@ -136,7 +136,7 @@ _stateset() {
     'seed-fx:refresh FX quotes'
     'bridges:start bridges'
     'bridges\:stop:stop bridges'
-    'demo:lifecycle | realmoney | verify'
+    'demo:lifecycle | realmoney | verify | multisig | verify-onchain'
     'audit:verify-receipt against a path'
     'receipts:list every receipt JSON'
     'test:contracts + bridges + demos'
@@ -385,14 +385,16 @@ EOF
     ;;
 
   demo)
-    name="${2:-}"; [ -z "$name" ] && { echo "usage: stateset demo {lifecycle|realmoney|verify}"; exit 2; }
+    name="${2:-}"; [ -z "$name" ] && { echo "usage: stateset demo {lifecycle|realmoney|verify|multisig|verify-onchain}"; exit 2; }
     cd "$ROOT/demos"
     [ -d node_modules ] || { info "installing demo deps…"; npm install --silent; }
     case "$name" in
-      lifecycle) exec node escrow-lifecycle.mjs ;;
-      realmoney) exec node realmoney-loop.mjs ;;
-      verify)    exec node verify-receipt.mjs "${@:3}" ;;
-      *)         echo "unknown demo: $name (lifecycle|realmoney|verify)"; exit 2 ;;
+      lifecycle)     exec node escrow-lifecycle.mjs ;;
+      realmoney)     exec node realmoney-loop.mjs ;;
+      verify)        exec node verify-receipt.mjs "${@:3}" ;;
+      multisig)      exec node multisig-operator.mjs ;;
+      verify-onchain) exec node verify-onchain.mjs "${@:3}" ;;
+      *)             echo "unknown demo: $name (lifecycle|realmoney|verify|multisig|verify-onchain)"; exit 2 ;;
     esac
     ;;
 
@@ -402,7 +404,13 @@ EOF
     info "bridges (node --test)…"
     (cd "$ROOT/bridges" && npm test 2>&1 | tail -8)
     info "demo syntax check…"
-    (cd "$ROOT/demos" && node --check escrow-lifecycle.mjs && node --check realmoney-loop.mjs && node --check verify-receipt.mjs && ok "demos syntax OK")
+    (cd "$ROOT/demos" && \
+      node --check escrow-lifecycle.mjs && \
+      node --check realmoney-loop.mjs && \
+      node --check verify-receipt.mjs && \
+      node --check multisig-operator.mjs && \
+      node --check verify-onchain.mjs && \
+      ok "demos syntax OK")
     ;;
 
   bench)
@@ -472,6 +480,8 @@ EOF
         node --check escrow-lifecycle.mjs && \
         node --check realmoney-loop.mjs && \
         node --check verify-receipt.mjs && \
+        node --check multisig-operator.mjs && \
+        node --check verify-onchain.mjs && \
         node --check validate-fixture.mjs && \
         bash -n audit-with-cast.sh && \
         node validate-fixture.mjs >/dev/null 2>&1); then ok "demos syntax + fixture clean"

@@ -471,7 +471,12 @@ contract SetPaymentBatch is
             return (false, "Amount above maximum");
         }
 
-        // Check daily limit (reset if new day)
+        // Why a fixed 1-day window vs a sliding one: storing per-payment
+        // timestamps would cost O(n) per asset; this tracks one (volume,
+        // anchor) tuple and resets when 24h have passed since the anchor.
+        // The first settlement in any 24h window resets the budget, so a
+        // batch can briefly burst above `dailyLimit` if it straddles the
+        // boundary — acceptable for a quickstart, document if tightening.
         if (block.timestamp >= config.lastDayReset + 1 days) {
             config.dailyVolume = 0;
             config.lastDayReset = uint64(block.timestamp);
@@ -493,8 +498,16 @@ contract SetPaymentBatch is
             return (false, "Insufficient allowance");
         }
 
-        // Transfer tokens. Handle both reverting tokens and non-reverting tokens
-        // that return `false` on failure.
+        // Why the low-level call instead of SafeERC20 here: we need to soft-fail
+        // an individual payment (emit PaymentFailed, keep settling the rest of
+        // the batch) rather than revert the whole transaction. SafeERC20's
+        // revert would unwind the batch.
+        //
+        // Why `returndata.length > 0 && !decode(bool)`: USDT and a few legacy
+        // tokens return `false` on failure instead of reverting; native ERC20s
+        // return `true` or revert. The empty-returndata branch (length == 0)
+        // is for the "no-return-value" tokens (e.g. some early WETH variants)
+        // which we treat as a no-revert-means-success token.
         (bool ok, bytes memory returndata) = address(token)
             .call(
                 abi.encodeWithSelector(
@@ -580,6 +593,12 @@ contract SetPaymentBatch is
      * @param _intentId Intent ID to verify
      * @param _proof Merkle proof (array of sibling hashes)
      * @param _index Leaf index in the tree
+     *
+     * @dev Why intent inclusion check exists alongside `settledIntents`:
+     *      the per-intent map says "we settled this", the Merkle proof says
+     *      "this intent was in the *original* batch the sequencer signed".
+     *      Together they prove the sequencer didn't insert a phantom payment
+     *      that wasn't in the signed-by-payer set.
      */
     function verifyPaymentInclusion(
         bytes32 _batchId,
@@ -592,6 +611,11 @@ contract SetPaymentBatch is
 
         bytes32 computedHash = _intentId;
 
+        // Why the same left/right ordering as SetRegistry: both build
+        // payment-side and event-side Merkle trees with the SAME
+        // `keccak256(abi.encodePacked(left, right))` rule. Off-chain
+        // tooling generates one canonical proof shape; this loop must
+        // mirror it byte-for-byte or inclusion proofs silently fail.
         for (uint256 i = 0; i < _proof.length; i++) {
             bytes32 proofElement = _proof[i];
 
